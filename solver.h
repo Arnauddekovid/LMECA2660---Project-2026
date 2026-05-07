@@ -5,7 +5,6 @@
 
 #ifndef solver_h
 #define solver_h
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>  
@@ -13,7 +12,6 @@
 #include "grid_and_data.h"
 #include "debug_functions.h"
 
-bool add_singularities = false;
 
 void set_init_s(struct grid_and_data *infos){
 
@@ -26,7 +24,6 @@ void set_init_s(struct grid_and_data *infos){
 
     for (int j = 0; j < infos->N; j++){
         for (int i = 0; i < infos->M; i++){
-
             infos->s_up[0][j][i] = rho_inf;
             infos->s_up[1][j][i] = rho_inf * u_inf;
             infos->s_up[2][j][i] = 0.;
@@ -44,18 +41,7 @@ void set_init_s(struct grid_and_data *infos){
         }
     }
 
-    // ajouter une singularité
 
-    if (add_singularities){
-
-        int i = infos->i_lead - 3;
-        int j = 2;
-        infos->s_up[0][j][i] = rho_inf*4;// 61, 429
-
-        i =  infos->i_trail - 3;
-        infos->s_up[0][j][i] = rho_inf*4; 
-
-    }
 
 
 }
@@ -335,27 +321,6 @@ void set_bounds_s_star(struct grid_and_data *infos ){
     }
 
 
-    /*
-    int edges[2] = {infos->i_lead, infos->i_trail};
-    for (int e = 0; e < 2; e++){
-        int i = edges[e];
-        infos->s_star_up[0][0][i] = infos->s_star_up[0][1][i];
-        infos->s_star_up[1][0][i] = infos->s_star_up[1][1][i];
-        infos->s_star_up[2][0][i] = 0.;
-        infos->s_star_up[3][0][i] = infos->s_star_up[3][1][i];
-
-        infos->s_star_down[0][infos->N-1][i] = infos->s_star_down[0][infos->N-2][i];
-        infos->s_star_down[1][infos->N-1][i] = infos->s_star_down[1][infos->N-2][i];
-        infos->s_star_down[2][infos->N-1][i] = 0.;
-        infos->s_star_down[3][infos->N-1][i] = infos->s_star_down[3][infos->N-2][i];
-    }
-
-    infos->s_star_up[2][0][infos->i_lead]  = 0.;
-    infos->s_star_up[2][0][infos->i_trail] = 0.;
-    infos->s_star_down[2][infos->N-1][infos->i_lead]  = 0.;
-    infos->s_star_down[2][infos->N-1][infos->i_trail] = 0.;
-
-    */
 
     // frontière commune downstream
     for (int i = infos->i_trail+1; i < infos->M; i++){
@@ -365,6 +330,9 @@ void set_bounds_s_star(struct grid_and_data *infos ){
 }
 
 void init_Fs(struct grid_and_data *infos){
+
+    int int_debug = -1;
+
     for (int j = 0; j < infos->N; j++){
         for (int i = 0; i < infos->M; i++){
 
@@ -416,14 +384,14 @@ void init_Fs(struct grid_and_data *infos){
 
 
 
-    for (int i = 0; i<infos->i_lead;i++){
+    for (int i = 0; i<infos->i_lead+int_debug;i++){
         for (int k = 0; k<4;k++){
             infos->F_i_up[k][0][i] = infos->F_i_down[k][infos->N-1][i];
             infos->F_j_up[k][0][i] = infos->F_j_down[k][infos->N-1][i];            
         }
     }
 
-    for (int i = infos->i_trail+1; i<infos->M;i++){
+    for (int i = infos->i_trail+1-int_debug; i<infos->M;i++){
         for (int k = 0; k<4;k++){
             infos->F_i_up[k][0][i] = infos->F_i_down[k][infos->N-1][i];
             infos->F_j_up[k][0][i] = infos->F_j_down[k][infos->N-1][i];     
@@ -432,9 +400,10 @@ void init_Fs(struct grid_and_data *infos){
 }
 
 void init_Fs_star(struct grid_and_data *infos){
+
+    int debug_int = -1;
     for (int j = 0; j < infos->N; j++){
         for (int i = 0; i < infos->M; i++){
-
             double rho_star_up = infos->s_star_up[0][j][i];
             double u_star_up   = infos->s_star_up[1][j][i]/rho_star_up;
             double v_star_up   = infos->s_star_up[2][j][i]/rho_star_up;
@@ -479,14 +448,14 @@ void init_Fs_star(struct grid_and_data *infos){
         }
     }
 
-    for (int i = 0; i<infos->i_lead;i++){
+    for (int i = 0; i<infos->i_lead+debug_int;i++){
         for (int k = 0; k<4;k++){
             infos->F_i_star_up[k][0][i] = infos->F_i_star_down[k][infos->N-1][i];
             infos->F_j_star_up[k][0][i] = infos->F_j_star_down[k][infos->N-1][i];            
         }
     }
 
-    for (int i = infos->i_trail+1; i<infos->M;i++){
+    for (int i = infos->i_trail+1-debug_int; i<infos->M;i++){
         for (int k = 0; k<4;k++){
             infos->F_i_star_up[k][0][i] = infos->F_i_star_down[k][infos->N-1][i];
             infos->F_j_star_up[k][0][i] = infos->F_j_star_down[k][infos->N-1][i];    
@@ -494,7 +463,9 @@ void init_Fs_star(struct grid_and_data *infos){
     }
 }
 
-double terme_diffusion_fct(struct grid_and_data *infos, double***s,int k,int j,int i, int j_plus_1, int j_minus_1){
+double terme_diffusion_fct(struct grid_and_data *infos, double***s_a, double***s_b,int k,int j,int i, int j_plus_1, int j_minus_1){
+
+    // I use s_a == s_b for every cases except the ones at the common border, where s_a = s_down and s_b = s_up = related to j+1
 
     double eps_min = infos->eps_min;
     double C = infos->C;
@@ -503,23 +474,23 @@ double terme_diffusion_fct(struct grid_and_data *infos, double***s,int k,int j,i
     int i_plus_1 = i+1;
     int i_minus_1 = i-1;
 
-    double delta_u_i_plus_1  = s[1][j][i_plus_1]/ s[0][j][i_plus_1] - s[1][j][i]/ s[0][j][i];
-    double delta_u_i_minus_1 = s[1][j][i]/ s[0][j][i] - s[1][j][i_minus_1]/ s[0][j][i_minus_1];
-    double delta_u_j_plus_1  = s[1][j_plus_1][i]/ s[0][j_plus_1][i] - s[1][j][i]/ s[0][j][i];
-    double delta_u_j_minus_1 = s[1][j][i]/ s[0][j][i] - s[1][j_minus_1][i]/ s[0][j_minus_1][i];
+    double delta_u_i_plus_1  = s_a[1][j][i_plus_1]/ s_a[0][j][i_plus_1] - s_a[1][j][i]/ s_a[0][j][i];
+    double delta_u_i_minus_1 = s_a[1][j][i]/ s_a[0][j][i] - s_a[1][j][i_minus_1]/ s_a[0][j][i_minus_1];
+    double delta_u_j_plus_1  = s_b[1][j_plus_1][i]/ s_b[0][j_plus_1][i] - s_a[1][j][i]/ s_a[0][j][i];
+    double delta_u_j_minus_1 = s_a[1][j][i]/ s_a[0][j][i] - s_a[1][j_minus_1][i]/ s_a[0][j_minus_1][i];
 
-    double delta_v_i_plus_1  = s[2][j][i_plus_1]/ s[0][j][i_plus_1] - s[2][j][i]/ s[0][j][i];
-    double delta_v_i_minus_1 = s[2][j][i]/ s[0][j][i] - s[2][j][i_minus_1]/ s[0][j][i_minus_1];
-    double delta_v_j_plus_1  = s[2][j_plus_1][i]/ s[0][j_plus_1][i] - s[2][j][i]/ s[0][j][i];
-    double delta_v_j_minus_1 = s[2][j][i]/ s[0][j][i] - s[2][j_minus_1][i]/ s[0][j_minus_1][i];
+    double delta_v_i_plus_1  = s_a[2][j][i_plus_1]/ s_a[0][j][i_plus_1] - s_a[2][j][i]/ s_a[0][j][i];
+    double delta_v_i_minus_1 = s_a[2][j][i]/ s_a[0][j][i] - s_a[2][j][i_minus_1]/ s_a[0][j][i_minus_1];
+    double delta_v_j_plus_1  = s_b[2][j_plus_1][i]/ s_b[0][j_plus_1][i] - s_a[2][j][i]/ s_a[0][j][i];
+    double delta_v_j_minus_1 = s_a[2][j][i]/ s_a[0][j][i] - s_a[2][j_minus_1][i]/ s_a[0][j_minus_1][i];
 
     double eps_i_plus_half  = eps_min + C*c*sqrt(delta_u_i_plus_1*delta_u_i_plus_1 + delta_v_i_plus_1*delta_v_i_plus_1);
     double eps_i_minus_half = eps_min + C*c*sqrt(delta_u_i_minus_1*delta_u_i_minus_1 + delta_v_i_minus_1*delta_v_i_minus_1);
     double eps_j_plus_half  = eps_min + C*c*sqrt(delta_u_j_plus_1*delta_u_j_plus_1 + delta_v_j_plus_1*delta_v_j_plus_1);
     double eps_j_minus_half = eps_min + C*c*sqrt(delta_u_j_minus_1*delta_u_j_minus_1 + delta_v_j_minus_1*delta_v_j_minus_1);
 
-    double terme_diffusion_i = eps_i_plus_half*(s[k][j][i_plus_1]-s[k][j][i]) -  eps_i_minus_half*(s[k][j][i]-s[k][j][i_minus_1]);
-    double terme_diffusion_j = eps_j_plus_half*(s[k][j_plus_1][i]-s[k][j][i]) -  eps_i_minus_half*(s[k][j][i]-s[k][j_minus_1][i]);
+    double terme_diffusion_i = eps_i_plus_half*(s_a[k][j][i_plus_1]-s_a[k][j][i]) -  eps_i_minus_half*(s_a[k][j][i]-s_a[k][j][i_minus_1]);
+    double terme_diffusion_j = eps_j_plus_half*(s_b[k][j_plus_1][i]-s_a[k][j][i]) -  eps_i_minus_half*(s_a[k][j][i]-s_a[k][j_minus_1][i]);
 
     double terme_diffusion = terme_diffusion_i + terme_diffusion_j;
 
@@ -528,6 +499,8 @@ double terme_diffusion_fct(struct grid_and_data *infos, double***s,int k,int j,i
 }
 
 void mac_cormack_forward(struct grid_and_data *infos){
+
+    int debug_int=-1;
 
     double dFidi;
     double dFjdj;
@@ -547,14 +520,11 @@ void mac_cormack_forward(struct grid_and_data *infos){
             // j-1 devient j+1
 
             //terme_diffusion = eps_min * (infos->s_down[k][j][i+1] - 2*infos->s_down[k][j][i] + infos->s_down[k][j][i-1]); // j-1 devient j+1
-            terme_diffusion = terme_diffusion_fct(infos, infos->s_down,k, j, i, j+1, j+1);
+            terme_diffusion = terme_diffusion_fct(infos, infos->s_down,infos->s_down,k, j, i, j+1, j+1);
              
             terme_tot = -dFidi + terme_diffusion;
-            infos->s_star_down[k][j][i] = infos->s_down[k][j][i] + infos->dt*terme_tot/infos->D_down[j][i];
-            
+            infos->s_star_down[k][j][i] = infos->s_down[k][j][i]*infos->D_down[j][i]/infos->D_down_t_plus_1[j][i] + infos->dt*terme_tot/infos->D_down_t_plus_1[j][i];        
         }
-        infos->mac_cormack_f_down_checker[j][i] = -1.;
-
     }
     // down part
     for (int j = 1; j < infos->N-1; j++){
@@ -564,18 +534,17 @@ void mac_cormack_forward(struct grid_and_data *infos){
                 dFjdj = infos->F_j_down[k][j+1][i]-infos->F_j_down[k][j][i];
 
                 //terme_diffusion = eps_min * (infos->s_down[k][j][i+1] - 2*infos->s_down[k][j][i] + infos->s_down[k][j][i-1])+ eps_min * (infos->s_down[k][j+1][i] - 2*infos->s_down[k][j][i] + infos->s_down[k][j-1][i]); 
-                terme_diffusion = terme_diffusion_fct(infos, infos->s_down,k, j, i, j+1, j-1);
+                terme_diffusion = terme_diffusion_fct(infos, infos->s_down,infos->s_down,k, j, i, j+1, j-1);
                 terme_tot = -(dFidi + dFjdj) + terme_diffusion;
-                infos->s_star_down[k][j][i] = infos->s_down[k][j][i] + infos->dt*terme_tot/infos->D_down[j][i];
+                infos->s_star_down[k][j][i] = infos->s_down[k][j][i]*infos->D_down[j][i]/infos->D_down_t_plus_1[j][i] + infos->dt*terme_tot/infos->D_down_t_plus_1[j][i];
                 
             }
-            infos->mac_cormack_f_down_checker[j][i] = 1.;
         }
     }
 
 
     // frontière upstream  A CHANGEYYYYYYYYY
-    for (int i = 1; i < infos->i_lead;i++){
+    for (int i = 1; i < infos->i_lead+debug_int;i++){
         for (int k = 0; k < 4; k++){
             int j = infos->N-1;
 
@@ -583,16 +552,14 @@ void mac_cormack_forward(struct grid_and_data *infos){
             dFjdj = infos->F_j_up[k][1][i]-infos->F_j_down[k][j][i];
             //dFjdj = 0.0;  // TEST
             
-            terme_diffusion = eps_min * (infos->s_down[k][j][i+1] - 2*infos->s_down[k][j][i] + infos->s_down[k][j][i-1])+ eps_min * (infos->s_up[k][1][i] - 2*infos->s_down[k][j][i] + infos->s_down[k][j-1][i]); 
+            terme_diffusion = terme_diffusion_fct(infos,infos->s_down, infos->s_up, k, j, i, 1, j-1 );
             terme_tot = -(dFidi + dFjdj) + terme_diffusion;
-            infos->s_star_down[k][j][i] = infos->s_down[k][j][i] + infos->dt*terme_tot/infos->D_down[j][i];
+            infos->s_star_down[k][j][i] = infos->s_down[k][j][i]*infos->D_down[j][i]/infos->D_down_t_plus_1[j][i] + infos->dt*terme_tot/infos->D_down_t_plus_1[j][i];
 
             infos->F_j_up[k][0][i] = infos->F_j_down[k][j][i];
             infos->F_i_up[k][0][i] = infos->F_i_down[k][j][i];
             infos->s_star_up[k][0][i] = infos->s_star_down[k][j][i];
 
-            infos->mac_cormack_f_up_checker[0][i] = 2.;
-            infos->mac_cormack_f_down_checker[j][i] = 2.;
 
         }
     }
@@ -601,7 +568,7 @@ void mac_cormack_forward(struct grid_and_data *infos){
 
     //up and downwing:
 
-    for (int i = infos->i_lead; i < infos->i_trail+1;i++){
+    for (int i = infos->i_lead+debug_int; i < infos->i_trail+1-debug_int;i++){
         for (int k = 0; k < 4; k++){
 
             int j = infos->N-1;
@@ -612,10 +579,10 @@ void mac_cormack_forward(struct grid_and_data *infos){
 
             //terme_diffusion = eps_min * (infos->s_down[k][j][i+1] - 2*infos->s_down[k][j][i] + infos->s_down[k][j][i-1]); 
 
-            terme_diffusion = terme_diffusion_fct(infos, infos->s_down, k, j, i, j-1, j-1);
+            terme_diffusion = terme_diffusion_fct(infos, infos->s_down,infos->s_down, k, j, i, j-1, j-1);
              
             terme_tot = -dFidi  + terme_diffusion;
-            infos->s_star_down[k][infos->N-1][i] = infos->s_down[k][infos->N-1][i] + infos->dt*terme_tot/infos->D_down[infos->N-1][i];
+            infos->s_star_down[k][infos->N-1][i] = infos->s_down[k][infos->N-1][i]*infos->D_down[j][i]/infos->D_down_t_plus_1[j][i] + infos->dt*terme_tot/infos->D_down_t_plus_1[infos->N-1][i];
 
             //upwing j-1 devient j+1
             j = 0;
@@ -623,37 +590,32 @@ void mac_cormack_forward(struct grid_and_data *infos){
             dFidi = infos->F_i_up[k][j][i+1]-infos->F_i_up[k][j][i];
 
             //terme_diffusion = eps_min * (infos->s_up[k][j][i+1] - 2*infos->s_up[k][j][i] + infos->s_up[k][j][i-1]); 
-            terme_diffusion = terme_diffusion_fct(infos, infos->s_up, k, j, i, j+1, j+1);
+            terme_diffusion = terme_diffusion_fct(infos, infos->s_up,infos->s_up, k, j, i, j+1, j+1);
             terme_tot = -dFidi + terme_diffusion;
             //printf("forw : i = %i, terme tot down = %f", i , terme_tot);
 
-            infos->s_star_up[k][j][i] = infos->s_up[k][j][i] + infos->dt*terme_tot/infos->D_up[j][i];
-
-            infos->mac_cormack_f_up_checker[j][i] = 3.;
-            infos->mac_cormack_f_down_checker[ infos->N-1][i] = 3.;
+            infos->s_star_up[k][j][i] = infos->s_up[k][j][i]*infos->D_up[j][i]/infos->D_up_t_plus_1[j][i] + infos->dt*terme_tot/infos->D_up_t_plus_1[j][i];
 
         }
     }
 
     //frontière downstream; 
-    for (int i = infos->i_trail+1; i < infos->M-1;i++){
+    for (int i = infos->i_trail+1+debug_int; i < infos->M-1;i++){
         for (int k = 0; k < 4; k++){
             int j = infos->N-1;
             dFidi = infos->F_i_down[k][infos->N-1][i+1]-infos->F_i_down[k][infos->N-1][i];
             dFjdj = infos->F_j_up[k][1][i]-infos->F_j_down[k][infos->N-1][i];
 
-            terme_diffusion = eps_min * (infos->s_down[k][j][i+1] - 2*infos->s_down[k][j][i] + infos->s_down[k][j][i-1])+ eps_min * (infos->s_up[k][1][i] - 2*infos->s_down[k][j][i] + infos->s_down[k][j-1][i]); 
+            terme_diffusion = terme_diffusion_fct(infos,infos->s_down, infos->s_up, k, j, i, 1, j-1 );
             terme_tot = -(dFidi + dFjdj) + terme_diffusion;
             
-            infos->s_star_down[k][infos->N-1][i] = infos->s_down[k][infos->N-1][i] + infos->dt*terme_tot/infos->D_down[infos->N-1][i];
+            infos->s_star_down[k][infos->N-1][i] = infos->s_down[k][infos->N-1][i]*infos->D_down[j][i]/infos->D_down_t_plus_1[j][i] + infos->dt*terme_tot/infos->D_down_t_plus_1[infos->N-1][i];
 
             infos->F_j_up[k][0][i] = infos->F_j_down[k][infos->N-1][i];
             infos->F_i_up[k][0][i] = infos->F_i_down[k][infos->N-1][i];
             infos->s_star_up[k][0][i] = infos->s_star_down[k][infos->N-1][i];
         }
 
-        infos->mac_cormack_f_up_checker[0][i] = 4.;
-        infos->mac_cormack_f_down_checker[infos->N-1][i] = 4.;
     }
 
 
@@ -667,13 +629,12 @@ void mac_cormack_forward(struct grid_and_data *infos){
                 dFjdj = infos->F_j_up[k][j+1][i]-infos->F_j_up[k][j][i];
 
                 //terme_diffusion = eps_min * (infos->s_up[k][j][i+1] - 2*infos->s_up[k][j][i] + infos->s_up[k][j][i-1])+ eps_min * (infos->s_up[k][j+1][i] - 2*infos->s_up[k][j][i] + infos->s_up[k][j-1][i]);
-                terme_diffusion = terme_diffusion_fct(infos, infos->s_up, k, j, i, j+1, j-1);
+                terme_diffusion = terme_diffusion_fct(infos, infos->s_up,infos->s_up, k, j, i, j+1, j-1);
 
                 terme_tot = -(dFidi + dFjdj) + terme_diffusion;
-                infos->s_star_up[k][j][i] = infos->s_up[k][j][i] + infos->dt*terme_tot/infos->D_up[j][i];
+                infos->s_star_up[k][j][i] = infos->s_up[k][j][i]*infos->D_up[j][i]/infos->D_up_t_plus_1[j][i] + infos->dt*terme_tot/infos->D_up_t_plus_1[j][i];
 
             }
-            infos->mac_cormack_f_up_checker[j][i] = 5.;
         }
     }
 
@@ -685,25 +646,23 @@ void mac_cormack_forward(struct grid_and_data *infos){
             dFidi = infos->F_i_up[k][j][i+1]-infos->F_i_up[k][j][i];
 
             //terme_diffusion = eps_min * (infos->s_up[k][j][i+1] - 2*infos->s_up[k][j][i] + infos->s_up[k][j][i-1]);
-            terme_diffusion = terme_diffusion_fct(infos, infos->s_up, k, j, i, j-1, j-1);
+            terme_diffusion = terme_diffusion_fct(infos, infos->s_up,infos->s_up, k, j, i, j-1, j-1);
 
             terme_tot = -dFidi + terme_diffusion;
-            infos->s_star_up[k][j][i] = infos->s_up[k][j][i] + infos->dt*terme_tot/infos->D_up[j][i];
+            infos->s_star_up[k][j][i] = infos->s_up[k][j][i]*infos->D_up[j][i]/infos->D_up_t_plus_1[j][i] + infos->dt*terme_tot/infos->D_up_t_plus_1[j][i];
         }
-        infos->mac_cormack_f_up_checker[j][i] = 6.;
     }
 
 
 }
 
 void mac_cormack_backward(struct grid_and_data *infos){
-
+    int debug_int = -1;
     double dFidi;
     double dFjdj;
     double terme_diffusion;
     double terme_tot;
     double epsilon;
-
 
     // down wall j-1 devient j+1
     for (int i = 1; i < infos->M-1;i++){
@@ -716,12 +675,11 @@ void mac_cormack_backward(struct grid_and_data *infos){
             epsilon = infos->eps_min;
             //terme_diffusion = epsilon * (infos->s_star_down[k][j][i+1] - 2*infos->s_star_down[k][j][i] + infos->s_star_down[k][j][i-1]);
 
-            terme_diffusion = terme_diffusion_fct(infos, infos->s_star_down, k, j, i, j+1, j+1);
+            terme_diffusion = terme_diffusion_fct(infos, infos->s_star_down,infos->s_star_down, k, j, i, j+1, j+1);
 
             terme_tot = -dFidi + terme_diffusion;
-            infos->s_down[k][0][i] = 0.5*(infos->s_star_down[k][0][i] + infos->s_down[k][0][i])+ 0.5*infos->dt/infos->D_down[0][i] * terme_tot;
+            infos->s_down[k][0][i] = 0.5*(infos->s_star_down[k][0][i] + infos->s_down[k][0][i])*infos->D_down[j][i]/infos->D_down_t_plus_1[j][i]+ 0.5*infos->dt/infos->D_down_t_plus_1[0][i] * terme_tot;
         }
-        infos->mac_cormack_b_down_checker[0][i] = 1.;
     }
 
 
@@ -734,21 +692,19 @@ void mac_cormack_backward(struct grid_and_data *infos){
                 dFjdj = infos->F_j_star_down[k][j][i]-infos->F_j_star_down[k][j-1][i];
                 //dFjdj = infos->F_j_star_down[k][j+1][i] - infos->F_j_star_down[k][j][i];  // ← inversé
 
-
                 epsilon = infos->eps_min;
                 //terme_diffusion = epsilon * (infos->s_star_down[k][j][i+1] - 2*infos->s_star_down[k][j][i] + infos->s_star_down[k][j][i-1])+ epsilon * (infos->s_star_down[k][j-1][i] - 2*infos->s_star_down[k][j][i] + infos->s_star_down[k][j+1][i]);
                 
-                terme_diffusion = terme_diffusion_fct(infos, infos->s_star_down, k, j, i, j+1, j-1);
+                terme_diffusion = terme_diffusion_fct(infos, infos->s_star_down,infos->s_star_down, k, j, i, j+1, j-1);
                 terme_tot = -(dFidi + dFjdj) + terme_diffusion;
-                infos->s_down[k][j][i] = 0.5*(infos->s_star_down[k][j][i] + infos->s_down[k][j][i])+ 0.5*infos->dt/infos->D_down[j][i] * terme_tot;
+                infos->s_down[k][j][i] = 0.5*(infos->s_star_down[k][j][i] + infos->s_down[k][j][i])*infos->D_down[j][i]/infos->D_down_t_plus_1[j][i]+ 0.5*infos->dt/infos->D_down_t_plus_1[j][i] * terme_tot;
 
             }
-            infos->mac_cormack_b_down_checker[j][i] = 2.;
         }
     }
 
     // frontière upstream 
-    for (int i = 1; i < infos->i_lead;i++){
+    for (int i = 1; i < infos->i_lead+debug_int;i++){
         int j = infos->N-1;
         for (int k = 0; k < 4; k++){
             dFidi = infos->F_i_star_down[k][j][i]-infos->F_i_star_down[k][j][i-1];
@@ -759,19 +715,17 @@ void mac_cormack_backward(struct grid_and_data *infos){
             terme_diffusion = epsilon * (infos->s_star_down[k][j][i+1] - 2*infos->s_star_down[k][j][i] + infos->s_star_down[k][j][i-1])+ epsilon * (infos->s_star_down[k][j-1][i] - 2*infos->s_star_down[k][j][i] + infos->s_star_up[k][1][i]);
 
             terme_tot = -(dFidi + dFjdj) + terme_diffusion;
-            infos->s_down[k][j][i] = 0.5*(infos->s_star_down[k][j][i] + infos->s_down[k][j][i]) + 0.5*infos->dt/infos->D_down[j][i] * terme_tot;
+            infos->s_down[k][j][i] = 0.5*(infos->s_star_down[k][j][i] + infos->s_down[k][j][i])*infos->D_down[j][i]/infos->D_down_t_plus_1[j][i] + 0.5*infos->dt/infos->D_down_t_plus_1[j][i] * terme_tot;
 
             infos->F_j_star_up[k][0][i] = infos->F_j_star_down[k][j][i];
             infos->F_i_star_up[k][0][i] = infos->F_i_star_down[k][j][i];
             //infos->s_up[k][0][i] = infos->s_down[k][infos->N-1][i];
         }
-        infos->mac_cormack_b_up_checker[0][i] = 3.;
-        infos->mac_cormack_b_down_checker[j][i] = 3.;
     }
 
     //up and down wing:
     
-    for (int i = infos->i_lead; i < infos->i_trail+1;i++){
+    for (int i = infos->i_lead+debug_int; i < infos->i_trail+1-debug_int;i++){
         for (int k = 0; k < 4; k++){
             int j = infos->N-1;
             //down wing, j+1 devient j-1
@@ -782,10 +736,10 @@ void mac_cormack_backward(struct grid_and_data *infos){
 
             epsilon = infos->eps_min;
             //terme_diffusion = epsilon * (infos->s_star_down[k][j][i+1] - 2*infos->s_star_down[k][j][i] + infos->s_star_down[k][j][i-1]);
-            terme_diffusion = terme_diffusion_fct(infos, infos->s_star_down, k, j, i, j-1, j-1);
+            terme_diffusion = terme_diffusion_fct(infos, infos->s_star_down,infos->s_star_down, k, j, i, j-1, j-1);
 
             terme_tot = -dFidi + terme_diffusion;
-            infos->s_down[k][j][i] = 0.5*(infos->s_star_down[k][j][i] + infos->s_down[k][j][i]) + 0.5*infos->dt/infos->D_down[j][i] * terme_tot;
+            infos->s_down[k][j][i] = 0.5*(infos->s_star_down[k][j][i] + infos->s_down[k][j][i])*infos->D_down[j][i]/infos->D_down_t_plus_1[j][i] + 0.5*infos->dt/infos->D_down_t_plus_1[j][i] * terme_tot;
 
             //upwing j-1 devient j+1
             j = 0;
@@ -794,18 +748,16 @@ void mac_cormack_backward(struct grid_and_data *infos){
             epsilon = infos->eps_min;
             //terme_diffusion = epsilon * (infos->s_star_up[k][j][i+1] - 2*infos->s_star_up[k][j][i] + infos->s_star_up[k][j][i-1]);
 
-            terme_diffusion = terme_diffusion_fct(infos, infos->s_star_up, k, j, i, j+1, j+1);
+            terme_diffusion = terme_diffusion_fct(infos, infos->s_star_up,  infos->s_star_up, k, j, i, j+1, j+1);
             terme_tot = -dFidi + terme_diffusion;
 
-            infos->s_up[k][j][i] = 0.5*(infos->s_star_up[k][j][i] + infos->s_up[k][j][i])+ 0.5*infos->dt/infos->D_up[j][i] * terme_tot;
+            infos->s_up[k][j][i] = 0.5*(infos->s_star_up[k][j][i] + infos->s_up[k][j][i])*infos->D_up[j][i]/infos->D_up_t_plus_1[j][i]+ 0.5*infos->dt/infos->D_up_t_plus_1[j][i] * terme_tot;
 
         }
 
-        infos->mac_cormack_b_up_checker[0][i] = 4.;
-        infos->mac_cormack_b_down_checker[infos->N-1][i] = 4.;
     }
     //frontière downstream;
-    for (int i = infos->i_trail+1; i < infos->M-1;i++){
+    for (int i = infos->i_trail+1-debug_int; i < infos->M-1;i++){
         for (int k = 0; k < 4; k++){
             int j = infos->N-1;
             dFidi = infos->F_i_star_down[k][j][i]-infos->F_i_star_down[k][j][i-1];
@@ -816,15 +768,13 @@ void mac_cormack_backward(struct grid_and_data *infos){
             terme_diffusion = epsilon * (infos->s_star_down[k][j][i+1] - 2*infos->s_star_down[k][j][i] + infos->s_star_down[k][j][i-1])+ epsilon * (infos->s_star_down[k][j-1][i] - 2*infos->s_star_down[k][j][i] + infos->s_star_up[k][1][i]);
 
             terme_tot = -(dFidi + dFjdj) + terme_diffusion;
-            infos->s_down[k][j][i] = 0.5*(infos->s_star_down[k][j][i] + infos->s_down[k][j][i]) + 0.5*infos->dt/infos->D_down[j][i] * terme_tot;
+            infos->s_down[k][j][i] = 0.5*(infos->s_star_down[k][j][i] + infos->s_down[k][j][i])*infos->D_down[j][i]/infos->D_down_t_plus_1[j][i] + 0.5*infos->dt/infos->D_down_t_plus_1[j][i] * terme_tot;
 
             infos->F_j_star_up[k][0][i] = infos->F_j_star_down[k][j][i];
             infos->F_i_star_up[k][0][i] = infos->F_i_star_down[k][j][i];
             //infos->s_up[k][0][i] = infos->s_down[k][j][i];
 
         }
-        infos->mac_cormack_b_up_checker[0][i] = 5.;
-        infos->mac_cormack_b_down_checker[infos->N-1][i] = 5.;
     }
     //upper part
     for (int j = 1; j < infos->N-1; j++){
@@ -836,13 +786,10 @@ void mac_cormack_backward(struct grid_and_data *infos){
 
                 epsilon = infos->eps_min;
                 //terme_diffusion = epsilon * (infos->s_star_up[k][j][i+1] - 2*infos->s_star_up[k][j][i] + infos->s_star_up[k][j][i-1])+ epsilon * (infos->s_star_up[k][j+1][i] - 2*infos->s_star_up[k][j][i] + infos->s_star_up[k][j-1][i]);
-                terme_diffusion = terme_diffusion_fct(infos, infos->s_star_up, k, j, i, j+1, j-1);
+                terme_diffusion = terme_diffusion_fct(infos, infos->s_star_up,infos->s_star_up, k, j, i, j+1, j-1);
                 terme_tot = -(dFidi + dFjdj) + terme_diffusion;
-                infos->s_up[k][j][i] = 0.5*(infos->s_star_up[k][j][i] + infos->s_up[k][j][i]) + 0.5*infos->dt/infos->D_up[j][i] * terme_tot;
+                infos->s_up[k][j][i] = 0.5*(infos->s_star_up[k][j][i] + infos->s_up[k][j][i])*infos->D_up[j][i]/infos->D_up_t_plus_1[j][i] + 0.5*infos->dt/infos->D_up_t_plus_1[j][i] * terme_tot;
             }
-
-
-            infos->mac_cormack_b_up_checker[j][i] = 6.;
         }
 
     }
@@ -858,14 +805,12 @@ void mac_cormack_backward(struct grid_and_data *infos){
             epsilon = infos->eps_min;
             //terme_diffusion = epsilon * (infos->s_star_up[k][j][i+1] - 2*infos->s_star_up[k][j][i] + infos->s_star_up[k][j][i-1]);
 
-            terme_diffusion = terme_diffusion_fct(infos, infos->s_star_up, k, j, i, j-1, j+1);
+            terme_diffusion = terme_diffusion_fct(infos, infos->s_star_up,infos->s_star_up, k, j, i, j-1, j+1);
         
             terme_tot = -dFidi  + terme_diffusion;
-            infos->s_up[k][j][i] = 0.5*(infos->s_star_up[k][j][i] + infos->s_up[k][j][i]) + 0.5*infos->dt/infos->D_up[j][i] * terme_tot;
+            infos->s_up[k][j][i] = 0.5*(infos->s_star_up[k][j][i] + infos->s_up[k][j][i])*infos->D_up[j][i]/infos->D_up_t_plus_1[j][i] + 0.5*infos->dt/infos->D_up_t_plus_1[j][i] * terme_tot;
         }
-        infos->mac_cormack_b_up_checker[j][i] = 7.;
-        }
-
+    }
 }
 
 void solver_one_time_step(struct grid_and_data *infos){
@@ -882,6 +827,7 @@ void solver_one_time_step(struct grid_and_data *infos){
 void solver_all_steps(struct grid_and_data *infos){
 
     set_x_grid(infos);
+    leading_and_trailing_edge_finder(infos);   
     init_y_grid(infos);
     update_y_grid(infos);
     set_init_s(infos);

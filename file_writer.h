@@ -14,8 +14,15 @@
 
 FILE * generate_file(struct grid_and_data *infos){
     char *filename = (char*) calloc(100, sizeof(char));
-    sprintf(filename,"M_inf = %f until t_end = %f.txt", infos->M_inf, infos->t_end);
-
+    if (infos->mu > 0.){
+        sprintf(filename,"M_%g_moving_until_%gs.txt", infos->M_inf,infos->t_end);
+    }
+    else if (infos->grow_rate_M_inf > 0.){
+        sprintf(filename,"M_%g_growing_until_%gs.txt", infos->M_inf,infos->t_end);  
+    }
+    else{
+        sprintf(filename,"M_%g_static_until_%gs.txt", infos->M_inf,infos->t_end);
+    }
     FILE * fp = fopen(filename, "w"); 
     return fp;
 }
@@ -70,18 +77,19 @@ void write_other_data( struct grid_and_data *infos, FILE * fp, double** data_up,
 
 void write_first_two_lines( struct grid_and_data *infos, FILE *fp){
 
-    //write x valuesx
-    fprintf(fp, "eps_min = %f, C = %f, \n", infos->eps_min, infos->C);
+    fprintf(fp, "M_inf = %g T_0_inf = %g p_0_inf = %g R_fluid = %g gamma = %g c = %g mu = %g omega = %g \n", infos->M_inf, infos->T_0_inf, infos->p_0_inf, infos->R_fluid, infos->gamma, infos->c, infos->mu, infos->omega);
     for (int j= 0; j < infos->M; j++){
         fprintf(fp, "%f ", infos->x[j]);
     }
     fprintf(fp, "\n");
 }
 
+
+
 void write_one_time_step( struct grid_and_data *infos, FILE * fp){
 
     // write the value of t
-    fprintf(fp, "%f \n", infos->t);
+    fprintf(fp, "y_grid at t = %g M_inf = %g\n", infos->t, infos->M_inf  );
     //write the coordinates of y_up
     for (int j = 0; j < infos->N; j++){
         for (int i = 0; i < infos->M; i++){
@@ -97,57 +105,24 @@ void write_one_time_step( struct grid_and_data *infos, FILE * fp){
         }
         fprintf(fp, "\n");
     }
-    // rewrite the value of t bc why not
-    fprintf(fp, "%f \n", infos->t);
 
-    // write the values of u_up annd then u_down
-
-    double gamma = infos->gamma;
-    double T_0 = infos->T_0_inf; 
-    double R = infos->R_fluid;
-
-    for (int j = 0; j < infos->N; j++){
-        for (int i = 0; i < infos->M; i++){
-            double rho = infos->s_up[0][infos->N-1-j][i];
-            double u = infos->s_up[1][infos->N-1-j][i]/rho;
-            double v = infos->s_up[2][infos->N-1-j][i]/rho;
-            double U0 = infos->s_up[3][infos->N-1-j][i]/rho;
-            double p = rho*(gamma-1.)*(U0 -0.5*(u*u+v*v));
-
-            double c_sound  = sqrt(gamma*p/rho);
-
-            double T = p/(rho*R);
-
-            //double mach = sqrt(2./(gamma-1.)*(T_0/T-1.));
-            double mach = sqrt(u*u+v*v)/c_sound;
-            double value =  mach;
-            
-            fprintf(fp, "%f ", value);
-
+    for (int k = 0; k < 4; k++){
+        // rewrite the value of t bc why not
+        fprintf(fp, "s_%i at t = %g M_inf = %g\n",k, infos->t, infos->M_inf   );
+        // write the values of s_0 up annd then s_0 down
+        for (int j = 0; j < infos->N; j++){
+            for (int i = 0; i < infos->M; i++){
+                fprintf(fp, "%f ", infos->s_up[k][infos->N-1-j][i]);
+            }
+            fprintf(fp, "\n");
         }
-        fprintf(fp, "\n");
-    }
-    for (int j = 0; j < infos->N; j++){
-        for (int i = 0; i < infos->M; i++){
-            double rho = infos->s_down[0][infos->N-1-j][i];
-            double u = infos->s_down[1][infos->N-1-j][i]/rho;
-            double v = infos->s_down[2][infos->N-1-j][i]/rho;
-            double U0 =infos->s_down[3][infos->N-1-j][i]/rho;
-            double p = rho*(gamma-1.)*(U0 -0.5*(u*u+v*v));
-
-            double c_sound  = sqrt(gamma*p/rho);
-
-            double T = p/(rho*R);
-
-            //double mach = sqrt(2./(gamma-1.)*(T_0/T-1.));
-            double mach = sqrt(u*u+v*v)/c_sound;
-            double value = mach;
-            
-            fprintf(fp, "%f ", value);
+        for (int j = 0; j < infos->N; j++){
+            for (int i = 0; i < infos->M; i++){
+                fprintf(fp, "%f ",  infos->s_down[k][infos->N-1-j][i]);
+            }
+            fprintf(fp, "\n");
         }
-        fprintf(fp, "\n");
     }
-    
 }
 
 #endif

@@ -1,27 +1,39 @@
 from file_reader import *
 
-filename_M050_t01 = "M_inf = 0.500000 until t_end = 0.100000.txt"
-filename_M050_t001 = "M_inf = 0.500000 until t_end = 0.010000.txt"
-filename_M050_t0001 = "M_inf = 0.500000 until t_end = 0.001000.txt"
-filename_M050_t00001 = "M_inf = 0.500000 until t_end = 0.000100.txt"
-filename_M050_t000001 = "M_inf = 0.500000 until t_end = 0.000010.txt"
+M_05_static_until_001s = "M_0.5_static_until_0.01s.txt"
+M_05_moving_until_001s = "M_0.5_moving_until_0.01s.txt"
 
+M_05_static_until_01s = "M_0.5_static_until_0.1s.txt"
 
-filename_M085_t1 = "M_inf = 0.850000 until t_end = 1.000000.txt"
-filename_M085_t01 = "M_inf = 0.850000 until t_end = 0.100000.txt"
-filename_M085_t001 = "M_inf = 0.850000 until t_end = 0.010000.txt"
-filename_M085_t0001 = "M_inf = 0.850000 until t_end = 0.001000.txt"
-filename_M085_t00001 = "M_inf = 0.850000 until t_end = 0.000100.txt"
-filename_M085_t000001 = "M_inf = 0.850000 until t_end = 0.000010.txt"
+M_085_static_until_001s = "M_0.85_static_until_0.01s.txt"
+M_085_moving_until_001s = "M_0.85_moving_until_0.01s.txt"
 
+M_085_moving_until_01s = "M_0.85_moving_until_0.1s.txt"
 
-data_D = "D  M_inf = 0.500000 until t_end = 0.000100.txt"
+M_085_static_until_01s = "M_0.85_static_until_0.1s.txt"
+M_085_moving_until_01s = "M_0.85_moving_until_0.1s.txt"
 
-delete_txt_file_after_animation = False
-#plot_grid(filename_M050_t000001)
+growing_M_inf_until_01s = "M_0.5_growing_until_0.1s.txt"
+growing_M_inf_until_05s = "M_0.5_growing_until_0.5s.txt"
 
-evolution_animation(filename_M085_t01, delete_txt_file_after_animation)
+test_static = "M_0.5_static_until_0.0001s.txt"
+test_moving = "M_0.5_moving_until_0.001s.txt"
 
-print("finished")
+#_____
 
-#plot_other_data(data_D, "D ")
+filename = M_085_static_until_001s
+
+all_plots = False
+if all_plots:
+    Mach_number_over_time_animation(filename)
+    Cp_over_time_animation(filename)
+    normalized_total_enthalpy_over_time_animation(filename)
+    normalized_total_pressure_over_time_animation(filename)
+    normalized_entropy_over_time_animation(filename)
+    normalized_vorticity_over_time_animation(filename)
+else:
+    #s_over_time_animation(filename)
+    #s0_over_time_animation(filename)
+    Mach_number_over_time_animation(filename)
+    #evolution_animation_grid(filename)
+
