@@ -11,7 +11,8 @@
 #include <stdbool.h>  
 
 struct grid_and_data{
-
+    bool hdd_storage;
+    double resolution;
     //pysical data 
     double M_inf_init;
     double M_inf;
@@ -51,7 +52,8 @@ struct grid_and_data{
     double t;
     double dt;
     double t_end;
-    double step_max;
+    double number_of_wrotten_steps; // 1000 steps pr une anumation de 33 secondes pour 1000 steps, 100 steps pr une animation de 3 secondes
+    double write_interval_steps;
 
     // some parameter we must choose carefuly
     double beta_1;
@@ -61,77 +63,68 @@ struct grid_and_data{
     double beta;
 
     double AOA;
+    double AOA_current;
+    double t_ramp;
+    double AOA_grow_rate;
     double mu;
     double omega;
 
     // grids
     double* x;  
-    double**y_up;
-    double**y_up_t_plus_1; // the grid at the t + dt in order to get the tempo dervative
-    double**y_down;
-    double**y_down_t_plus_1; 
-
-
+    double* y_up;
+    double* y_down;
 
 
     //derivatives and other stuff
 
-    double** D_up;
-    double** D_down;
-    double** D_up_t_plus_1; // à changer quand ça bougera au cours du temps
-    double** D_down_t_plus_1; // à changer quand ça bougera au cours du temps
+    double* D_up;
+    double* D_down;
+    double* D_up_t_plus_1; // à changer quand ça bougera au cours du temps
+    double* D_down_t_plus_1; // à changer quand ça bougera au cours du temps
 
     double* dxdi;
-    double** dy_updi;
-    double** dy_updj;
-    double** dy_updt;
-    double** dy_downdi;
-    double** dy_downdj;
-    double** dy_downdt;
+    double* dydi_up;
+    double* dydj_up;
+    double* dydt_up;
+    double* dydi_down;
+    double* dydj_down;
+    double* dydt_down;
     //no dxdj and no dxdt
 
 
     // physical dimensions in terms of s and F
     
-    double ***s_up;
-    double ***s_down;
-    double ***s_star_up;
-    double ***s_star_down;
+    double *s_up;
+    double *s_down;
+    double *s_star_up;
+    double *s_star_down;
 
-    double ***F_x_up;
-    double ***F_x_down;
-    double ***F_x_star_up; 
-    double ***F_x_star_down; 
+    double *F_i_up;
+    double *F_i_down;
+    double *F_i_star_up; 
+    double *F_i_star_down; 
 
-    double ***F_y_up;
-    double ***F_y_down;
-    double ***F_y_star_up; 
-    double ***F_y_star_down; 
-
-    double ***F_i_up;
-    double ***F_i_down;
-    double ***F_i_star_up; 
-    double ***F_i_star_down; 
-
-    double ***F_j_up;
-    double ***F_j_down;
-    double ***F_j_star_up; 
-    double ***F_j_star_down; 
+    double *F_j_up;
+    double *F_j_down;
+    double *F_j_star_up; 
+    double *F_j_star_down; 
 };
-
-void grow_L_to_7(struct grid_and_data *infos){
-    infos->L = 7.;
-    infos->beta_3 = 1.93668189;
-}
+  
 
 void leading_and_trailing_edge_finder(struct grid_and_data *infos){
+    /*
+        pre :
+            infos : the structure we use
+        post :
+            returns the x  indexes of the leading and trailing edges
+    */
     int i = 0;
 
     while (infos->x[i] < 0.){
         
         i +=1;
     }
-    infos->i_lead = i-1;
+    infos->i_lead = i;
     while (infos->x[i] <1.){
         
         i +=1;
@@ -140,30 +133,110 @@ void leading_and_trailing_edge_finder(struct grid_and_data *infos){
 
 }
 
-double f_plus(struct grid_and_data*infos, int index){   
-    
-    double x_i = infos->x[index];
+// case 1
+
+double f_plus_case1(struct grid_and_data*infos, double x_i, double t){
+    /*pre :
+            infos : the structure we use
+            x_i : the x_index where we compute the f_plus value
+            t : the time at which  we compute the f_plus value
+        post :
+            returns the y value of the point x_i at time t. it represents our upper part of the airfoil
+    */
+    double value_space = sqrt(-(x_i-infos->x_c)*(x_i-infos->x_c)+infos->R*infos->R)- sqrt(-infos->x_c*infos->x_c+infos->R*infos->R) ;
+    double value_AoA = (1.-2.*x_i/infos->c)*infos->c*tan(infos->AOA_current);
+    double value_time = (1.-2.*x_i/infos->c)* infos->mu*infos->c*sin(infos->omega*t) ;
+    return (value_space+value_AoA+ value_time)  ;
+}
+
+double f_minus_case1(struct grid_and_data*infos, double x_i, double t){
+    /*
+        pre :
+            infos : the structure we use
+            x_i : the x_index where we compute the f_minus value
+            t : the time at which  we compute the f_minus value
+        post :
+            returns the y value of the point x_i at time t. it represents our lower part of the airfoil
+    */
     double value_space = sqrt(-(x_i-infos->x_c)*(x_i-infos->x_c)+infos->R*infos->R)- sqrt(-infos->x_c*infos->x_c+infos->R*infos->R);
-    double value_time = (1.-2.*x_i/infos->c)*infos->mu*infos->c*sin(infos->omega*infos->t);
-    return (value_space +value_time)  /2.;
+    double value_AoA = (1.-2.*x_i/infos->c)*infos->c*tan(infos->AOA_current);
+    double value_time = (1.-2.*x_i/infos->c)* infos->mu*infos->c*sin(infos->omega*t) ;
+    return ( -value_space+value_AoA+value_time);
 }
 
-double f_minus(struct grid_and_data*infos, int index){
-    double x_i = infos->x[index];
-    double value_space = -sqrt(-(x_i-infos->x_c)*(x_i-infos->x_c)+infos->R*infos->R)+ sqrt(-infos->x_c*infos->x_c+infos->R*infos->R);
-    double value_time  = (1.-2.*x_i/infos->c)*infos->mu*infos->c*sin(infos->omega*infos->t);
-    return ( value_space+value_time) /2.;
+double ddt_f_plus_case1(struct grid_and_data*infos, double x_i){
+    /*
+        pre :
+            infos : the structure we use
+            x_i : the x_index where we compute the f_plus value
+           
+        post :
+            returns the y value of the point x_i a. it represents the time derivative of the upper part of the airfoil
+    */
+    double value_space = 0.;
+    double value_AoA =  (1.-2.*x_i/infos->c) * infos->c *infos->AOA_grow_rate/(cos(infos->AOA_current)*cos(infos->AOA_current));
+    double value_time = (1.-2.*x_i/infos->c)*infos->omega* infos->mu*infos->c*cos(infos->omega*infos->t) ;
+    return (value_space+value_AoA+value_time)  ;
 }
 
-double fonction_time_1(struct grid_and_data *infos, double time){
-
-    return infos->mu*infos->c*sin(infos->omega*time) ;
+double ddt_f_minus_case1(struct grid_and_data*infos, double x_i){
+    /*
+        pre :
+            infos : the structure we use
+            x_i : the x_index where we compute the f_plus value
+           
+        post :
+            returns the y value of the point x_i a. it represents the time derivative of the lower part of the airfoil
+    */
+    double value_space = 0.;
+    double value_AoA =  (1.-2.*x_i/infos->c) * infos->c *infos->AOA_grow_rate/(cos(infos->AOA_current)*cos(infos->AOA_current));
+    double value_time = (1.-2.*x_i/infos->c)*infos->omega* infos->mu*infos->c*cos(infos->omega*infos->t) ;
+    return (value_space+value_AoA+value_time)  ;
 }
 
-void set_x_grid(struct grid_and_data *infos){
+double ddx_f_plus_case1(struct grid_and_data*infos, double x_i){
+    /*
+        pre :
+            infos : the structure we use
+            x_i : the x_index where we compute the f_plus value
+           
+        post :
+            returns the y value of the point x_i a. it represent the space derivative of the upper part of the airfoil
+    */
+    double value_space = -(x_i-infos->x_c )/sqrt(-(x_i-infos->x_c)*(x_i-infos->x_c)+infos->R*infos->R);
+    double value_AoA = -2.*tan(infos->AOA_current);
+    double value_time = (-2./infos->c)* infos->mu*infos->c*sin(infos->omega*infos->t) ;
+    return (value_space+value_AoA+value_time)  ;
+}
 
-    // partie pour set l'axe x et dxdi
-    // upstream
+double ddx_f_minus_case1(struct grid_and_data*infos, double x_i){
+     /*
+        pre :
+            infos : the structure we use
+            x_i : the x_index where we compute the f_plus value
+        post :
+            returns the y value of the point x_i a. it represents the space derivative of the lower part of the airfoil
+    */
+    double value_space = -(x_i-infos->x_c )/sqrt(-(x_i-infos->x_c)*(x_i-infos->x_c)+infos->R*infos->R);
+    double value_AoA = -2.*tan(infos->AOA_current);
+    double value_time = (-2./infos->c)* infos->mu*infos->c*sin(infos->omega*infos->t) ;
+
+    return (-value_space+value_AoA+value_time)  ;
+}
+
+// case 2 stretching arfoil
+///TDÖKJIUVUC
+
+// Grid stuff
+
+void set_x_grid(struct grid_and_data *infos){ 
+     /*
+        pre :
+            infos : the structure we use
+        post :
+            put the x and dxdi values of the grid in infos. x is only one dimesion
+    */
+    
     for (int i= 0; i<infos->i_1; i++){
         infos->x[i] = (infos->L_u - infos->c/2)* tanh(infos->beta_1*i/infos->i_1)/tanh(infos->beta_1) - infos->L_u;
 
@@ -209,523 +282,224 @@ void set_x_grid(struct grid_and_data *infos){
 
 }
 
-void init_y_grid(struct grid_and_data *infos){
-
-    //on calcule les points en y, on calcule les dérivées dans update_y_grid
-    // trouve les indexes tq x = 0 et x=1
-    /*
-    double time_coef = fonction_time_1(infos, infos->t ) ;
-    double arg_up;
-    double arg_down;
-
-    double coef_up;
-    double coef_down;
-
-    for (int j =0; j <infos->N;j++){
-        arg_up =  1. - (double)j/(infos->N-1);
-        arg_down = (double)j/(infos->N-1);
-
-        coef_up =   1. - tanh(infos->beta_plus*arg_up)/tanh(infos->beta);
-        coef_down = 1. - tanh(infos->beta_minus* arg_down)/tanh(infos->beta);
-        
-        for (int i = 0; i < infos->i_lead; i++){
-            infos->y_up_t_plus_1[j][i]   = (infos->H/2- time_coef)*coef_up + time_coef;
-            infos->y_down_t_plus_1[j][i] =  -(infos->H/2 +time_coef)*coef_down +time_coef;
-        }
-
-        for (int i = infos->i_lead; i < infos->i_trail+1; i++){
-            infos->y_up_t_plus_1[j][i] = infos->H/2*(coef_up + arg_up*f_plus(infos, i));
-            infos->y_down_t_plus_1[j][i] = -infos->H/2*(coef_down - arg_down*f_minus(infos, i));
-        }
-
-        for(int i = infos->i_trail+1;i<infos->M;i++){
-            infos->y_up_t_plus_1[j][i] =  (infos->H/2 +time_coef)*coef_up  - time_coef;
-            infos->y_down_t_plus_1[j][i] = -(infos->H/2-time_coef)*coef_down -time_coef;
-        }
-    }
+void set_y_grid(struct grid_and_data *infos){ 
+    /* xpre :
+            infos : the structure we use
+        post :
+            put the y values of the grid in the upper and lower part. it also compute the derivatives of yin infos.
     */
 
+    //on calcule les points en y, on calcule les dérivées dans update_y_grid
+    int M = infos->M;
+    int N = infos->N;
     int i_lead  = infos->i_lead;
     int i_trail = infos->i_trail;
-    int di = 8;
-
-    double time_coef          = fonction_time_1(infos, infos->t);
-    double time_coef_t_plus_1 = fonction_time_1(infos, infos->t + infos->dt);
 
     for (int j = 0; j < infos->N; j++){
 
-        double arg_up   = 1. - (double)j / (infos->N-1); 
-        double arg_down = (double)j / (infos->N-1);       
+        double H = infos->H;
 
-        double coef_up   = 1. - tanh(infos->beta_plus *arg_up)   / tanh(infos->beta);
-        double coef_down = tanh(infos->beta_minus*arg_down)  / tanh(infos->beta) -1.;
+        double arg_up   = 1. - (double)j / (double)(infos->N-1.); 
+        double arg_down = (double)j / (double)(infos->N-1.);       
 
-        for (int i = 0; i < infos->M; i++){
-            infos->y_up[j][i]   = infos->y_up_t_plus_1[j][i];
-            infos->y_down[j][i] = infos->y_down_t_plus_1[j][i];
-        }
+        double h_up   = 1. - tanh(infos->beta_plus *arg_up)   / tanh(infos->beta);
+        double h_down = tanh(infos->beta_minus*arg_down)  / tanh(infos->beta) -1.;
+        
+        double dhdj_den  =  ((double)infos->N-1.)*tanh(infos->beta);
 
-        // upstream 
+        double dhdj_up   =  infos->beta_plus / (dhdj_den*cosh(infos->beta_plus *arg_up)*cosh(infos->beta_plus *arg_up));
+        double dhdj_down =  infos->beta_minus/ (dhdj_den*cosh(infos->beta_minus *arg_down)*cosh(infos->beta_minus *arg_down));
+        
         for (int i = 0; i < i_lead; i++){
-            infos->y_up_t_plus_1[j][i]   = (infos->H/2 - time_coef_t_plus_1)*coef_up   + time_coef_t_plus_1;
-            infos->y_down_t_plus_1[j][i] = (infos->H/2 + time_coef_t_plus_1)*coef_down + time_coef_t_plus_1;
+            double x_i = 0.;
+            infos->y_up[j*M+i] = 0.5*H*h_up + arg_up*f_plus_case1(infos, x_i, infos->t);
+            infos->y_down[j*M+i] = 0.5*H*h_down + arg_down*f_minus_case1(infos, x_i, infos->t);
+
+            infos->dydt_up[j*M+i] = (1. - h_up)*ddt_f_plus_case1(infos, x_i);
+            infos->dydt_down[j*M+i] = (1. + h_down)*ddt_f_minus_case1(infos, x_i);
+
+            infos->dydi_up[j*M+i]   = 0.;
+            infos->dydi_down[j*M+i] = 0.;
+
+            infos->dydj_up[j*M+i] = dhdj_up*(0.5*H - f_plus_case1(infos, x_i, infos->t));
+            infos->dydj_down[j*M+i] = dhdj_down*(0.5*H + f_minus_case1(infos, x_i, infos->t));
+
+            infos->D_up[j*M+i]   = infos->dxdi[i]*infos->dydj_up[j*M+i];
+            infos->D_down[j*M+i] = infos->dxdi[i]*infos->dydj_down[j*M+i];
+
+            infos->D_up_t_plus_1[j*M+i] = infos->dxdi[i]*dhdj_up*(0.5*H - f_plus_case1(infos, x_i, infos->t+infos->dt));
+            infos->D_down_t_plus_1[j*M+i] = infos->dxdi[i]*dhdj_down*(0.5*H + f_minus_case1(infos, x_i, infos->t+infos->dt));
         }
-
-        // leading edge smoothin
-        for (int i = i_lead; i < i_lead + di; i++){
-            double step  = (double)(i - i_lead) / (double)di;
-            double scale = step*step*(3. - 2.*step);  // 0 → 1
-
-            // Valeur upstream (ce qu'on avait juste avant i_lead)
-            double y_up_upstream   = (infos->H/2 - time_coef)*coef_up   + time_coef;
-            double y_down_upstream = (infos->H/2 + time_coef)*coef_down + time_coef;
-
-            // Valeur airfoil complet (ce qu'on aura à i_lead+di)
-            double y_up_airfoil   = (infos->H/2)*coef_up   + (infos->H/2)*arg_up  *f_plus(infos, i);
-            double y_down_airfoil = (infos->H/2)*coef_down + (infos->H/2)*arg_down*f_minus(infos, i);
-
-            // Interpolation cubique entre les deux
-            infos->y_up_t_plus_1[j][i]   = (1.-scale)*y_up_upstream   + scale*y_up_airfoil;
-            infos->y_down_t_plus_1[j][i] = (1.-scale)*y_down_upstream + scale*y_down_airfoil;
-        }
+        
 
         // arifoil central
-        for (int i = i_lead + di; i <= i_trail - di; i++){
-            double df_plusdi  = -0.5*(infos->x[i]-infos->x_c)/ sqrt(infos->R*infos->R - (infos->x[i]-infos->x_c)*(infos->x[i]-infos->x_c));
-            double df_minusdi = -df_plusdi;
+        for (int i = i_lead; i < i_trail; i++){
+            double x_i = infos->x[i];
+            infos->y_up[j*M+i] = 0.5*H*h_up + arg_up*f_plus_case1(infos, x_i, infos->t);
+            infos->y_down[j*M+i] = 0.5*H*h_down + arg_down*f_minus_case1(infos, x_i, infos->t);
 
-            infos->y_up_t_plus_1[j][i]   = (infos->H/2)*coef_up   + (infos->H/2)*arg_up  *f_plus(infos, i);
-            infos->y_down_t_plus_1[j][i] = (infos->H/2)*coef_down + (infos->H/2)*arg_down*f_minus(infos, i);;
+            infos->dydt_up[j*M+i] = (1. - h_up)*ddt_f_plus_case1(infos, x_i);
+            infos->dydt_down[j*M+i] = (1. + h_down)*ddt_f_minus_case1(infos, x_i);
 
+            infos->dydi_up[j*M+i]   = infos->dxdi[i]*( 1. - h_up)*ddx_f_plus_case1(infos, x_i);
+            infos->dydi_down[j*M+i] = infos->dxdi[i]*( 1. + h_down)*ddx_f_minus_case1(infos, x_i);
 
+            infos->dydj_up[j*M+i] = dhdj_up*(0.5*H - f_plus_case1(infos, x_i, infos->t));
+            infos->dydj_down[j*M+i] = dhdj_down*(0.5*H + f_minus_case1(infos, x_i, infos->t));
+
+            infos->D_up[j*M+i]   = infos->dxdi[i]*infos->dydj_up[j*M+i];
+            infos->D_down[j*M+i] = infos->dxdi[i]*infos->dydj_down[j*M+i];
+
+            infos->D_up_t_plus_1[j*M+i] = infos->dxdi[i]*dhdj_up*(0.5*H - f_plus_case1(infos, x_i, infos->t+infos->dt));
+            infos->D_down_t_plus_1[j*M+i] = infos->dxdi[i]*dhdj_down*(0.5*H + f_minus_case1(infos, x_i, infos->t+infos->dt));
         }
-
-        // Trailing edge smoothing
-        for (int i = i_trail - di; i <= i_trail; i++){
-            double step  = (double)(i_trail - i) / (double)di;
-            double scale = step*step*(3. - 2.*step);  // 1 → 0
-
-            // Valeur downstream (ce qu'on aura juste après i_trail)
-            double y_up_downstream   = (infos->H/2 + time_coef)*coef_up   - time_coef;
-            double y_down_downstream = (infos->H/2 - time_coef)*coef_down - time_coef;
-
-            // Valeur airfoil complet (ce qu'on avait à i_trail-di)
-            double y_up_airfoil   = (infos->H/2)*coef_up   + (infos->H/2)*arg_up  *f_plus(infos, i);
-            double y_down_airfoil = (infos->H/2)*coef_down + (infos->H/2)*arg_down*f_minus(infos, i);
-
-            // Interpolation cubique entre airfoil et downstream
-            infos->y_up_t_plus_1[j][i]   = scale*y_up_airfoil   + (1.-scale)*y_up_downstream;
-            infos->y_down_t_plus_1[j][i] = scale*y_down_airfoil + (1.-scale)*y_down_downstream;
-        }
-
 
         // downstream
-        for (int i = i_trail+1; i < infos->M; i++){
-            infos->y_up_t_plus_1[j][i]   =  (infos->H/2 + time_coef_t_plus_1)*coef_up   - time_coef_t_plus_1;
-            infos->y_down_t_plus_1[j][i] =  (infos->H/2 - time_coef_t_plus_1)*coef_down - time_coef_t_plus_1;
-
-        }
-    }
-}
-
-void update_y_grid_assymetrie(struct grid_and_data *infos){
-
-    infos->M_inf = infos->M_inf_init*(1. + infos->grow_rate_M_inf*infos->t);
-
-    int i_lead  = infos->i_lead;
-    int i_trail = infos->i_trail;
-    int di = 1;
-
-    double time_coef        =  fonction_time_1(infos, infos->t);
-    double time_coef_t_plus_1 = fonction_time_1(infos, infos->t + infos->dt);
-
-    double coef_coef = 2.;
-
-    for (int j = 0; j < infos->N; j++){
-
-        double arg_up   = 1. - (double)j / (infos->N-1); 
-        double arg_down = (double)j / (infos->N-1);       
-
-        double coef_up   = 1. - tanh(infos->beta_plus *arg_up)   / tanh(infos->beta);
-        double coef_down = tanh(infos->beta_minus*arg_down)  / tanh(infos->beta) -1.;
-
-        double h_j_up   = coef_up;   
-        double h_j_down = coef_down;
-
-        double numerator_up   = infos->beta_plus  / (double)(infos->N-1);
-        double denominator_up = tanh(infos->beta)*cosh(infos->beta_plus*arg_up)*cosh(infos->beta_plus*arg_up);
-        double dh_updj_coef   = (infos->H/2)*numerator_up / denominator_up;
-
-        double numerator_down   = infos->beta_minus / (double)(infos->N-1);
-        double denominator_down = tanh(infos->beta)*cosh(infos->beta_minus*arg_down)*cosh(infos->beta_minus*arg_down);
-        double dh_downdj_coef   = (infos->H/2)*numerator_down / denominator_down;
-
-
-        for (int i = 0; i < infos->M; i++){
-            infos->y_up[j][i]   = infos->y_up_t_plus_1[j][i];
-            infos->y_down[j][i] = infos->y_down_t_plus_1[j][i];
-            infos->dy_updi[j][i]   = 0.;
-            infos->dy_downdi[j][i] = 0.;
-        }
-
-        // upstream 
-        for (int i = 0; i < i_lead; i++){
-            infos->y_up_t_plus_1[j][i]   = (infos->H/2 - coef_coef*time_coef_t_plus_1)*coef_up   + coef_coef*time_coef_t_plus_1;
-            infos->y_down_t_plus_1[j][i] = (infos->H/2 + coef_coef*time_coef_t_plus_1)*coef_down + coef_coef*time_coef_t_plus_1;
-
-            infos->dy_updj[j][i]   = (infos->H/2 - time_coef)*numerator_up   / denominator_up;
-            infos->dy_downdj[j][i] = (infos->H/2 + time_coef)*numerator_down / denominator_down;
-        }
-
-        // Airfoil central
-        for (int i = i_lead ; i <= i_trail; i++){
-            double y_c_here          = time_coef          * (1. - 2.*infos->x[i] / infos->c);
-            double y_c_here_t_plus_1 = time_coef_t_plus_1 * (1. - 2.*infos->x[i] / infos->c);
-            double dy_c_here_di      = -2.*time_coef / infos->c * infos->dxdi[i];
-
-            double df_plusdi  = -0.5*(infos->x[i]-infos->x_c) / sqrt(infos->R*infos->R - (infos->x[i]-infos->x_c)*(infos->x[i]-infos->x_c));
-            double df_minusdi = -df_plusdi;
-
-            infos->y_up_t_plus_1[j][i]   = (infos->H/2 - y_c_here_t_plus_1)*coef_up   + y_c_here_t_plus_1 + (infos->H/2)*arg_up  *f_plus(infos, i);
-            infos->y_down_t_plus_1[j][i] = (infos->H/2 + y_c_here_t_plus_1)*coef_down + y_c_here_t_plus_1 + (infos->H/2)*arg_down*f_minus(infos, i);
-
-            infos->dy_updj[j][i]   = (infos->H/2 - y_c_here)*numerator_up   / denominator_up   + dh_updj_coef  *f_plus(infos, i);
-            infos->dy_downdj[j][i] = (infos->H/2 + y_c_here)*numerator_down / denominator_down - dh_downdj_coef*f_minus(infos, i);
-
-            infos->dy_updi[j][i]   = dy_c_here_di*(1. - coef_up)   + (infos->H/2)*infos->dxdi[i]*(1.-h_j_up)  *df_plusdi;
-            infos->dy_downdi[j][i] = dy_c_here_di*(1. - coef_down) + (infos->H/2)*infos->dxdi[i]*(1.+h_j_down)*df_minusdi;
-        }
-
-        // DOWNNNNNNSTREAMMMM
-
         for (int i = i_trail; i < infos->M; i++){
-            infos->y_up_t_plus_1[j][i]   =  (infos->H/2 + coef_coef*time_coef_t_plus_1)*coef_up   - coef_coef*time_coef_t_plus_1;
-            infos->y_down_t_plus_1[j][i] =  (infos->H/2 - coef_coef*time_coef_t_plus_1)*coef_down - coef_coef*time_coef_t_plus_1;
+            double x_i = 1.;
+            infos->y_up[j*M+i] = 0.5*H*h_up + arg_up*f_plus_case1(infos, x_i, infos->t);
+            infos->y_down[j*M+i] = 0.5*H*h_down + arg_down*f_minus_case1(infos, x_i, infos->t);
 
-            infos->dy_updj[j][i]   = (infos->H/2 + time_coef)*numerator_up   / denominator_up;
-            infos->dy_downdj[j][i] = (infos->H/2 - time_coef)*numerator_down / denominator_down;
+            infos->dydt_up[j*M+i] = (1. - h_up)*ddt_f_plus_case1(infos, x_i);
+            infos->dydt_down[j*M+i] = (1. + h_down)*ddt_f_minus_case1(infos, x_i);
+
+            infos->dydi_up[j*M+i]   = 0.;
+            infos->dydi_down[j*M+i] = 0.;
+
+            infos->dydj_up[j*M+i] = dhdj_up*(0.5*H - f_plus_case1(infos, x_i, infos->t));
+            infos->dydj_down[j*M+i] = dhdj_down*(0.5*H + f_minus_case1(infos, x_i, infos->t));
+
+            infos->D_up[j*M+i]   = infos->dxdi[i]*infos->dydj_up[j*M+i];
+            infos->D_down[j*M+i] = infos->dxdi[i]*infos->dydj_down[j*M+i];
+
+            infos->D_up_t_plus_1[j*M+i] = infos->dxdi[i]*dhdj_up*(0.5*H - f_plus_case1(infos, x_i, infos->t+infos->dt));
+            infos->D_down_t_plus_1[j*M+i] = infos->dxdi[i]*dhdj_down*(0.5*H + f_minus_case1(infos, x_i, infos->t+infos->dt));
         }
+    }
 
-        for (int i = 0; i < infos->M; i++){
-            infos->dy_updt[j][i]   = (infos->y_up_t_plus_1[j][i]   - infos->y_up[j][i])   / infos->dt;
-            infos->dy_downdt[j][i] = (infos->y_down_t_plus_1[j][i] - infos->y_down[j][i]) / infos->dt;
 
-            infos->D_up[j][i]          = infos->dxdi[i]*infos->dy_updj[j][i];
-            infos->D_down[j][i]        = infos->dxdi[i]*infos->dy_downdj[j][i];
-            infos->D_up_t_plus_1[j][i]   = infos->D_up[j][i];
-            infos->D_down_t_plus_1[j][i] = infos->D_down[j][i];
-        }
+    
+    int j_up = 0;
+    int j_down = infos->N-1;
+
+    int di_lead = 4;
+    int di = 4;
+
+    double H = infos->H;
+
+    double arg_up   = 1. - (double)j_up / (double)(infos->N-1.); 
+    double arg_down = (double)j_down / (double)(infos->N-1.);       
+
+    double h_up   = 1. - tanh(infos->beta_plus *arg_up)   / tanh(infos->beta);
+    double h_down = tanh(infos->beta_minus*arg_down)  / tanh(infos->beta) -1.;
+    
+    double dhdj_den  =  ((double)infos->N-1.)*tanh(infos->beta);
+
+    double dhdj_up   =  infos->beta_plus / (dhdj_den*cosh(infos->beta_plus *arg_up)*cosh(infos->beta_plus *arg_up));
+    double dhdj_down =  infos->beta_minus/ (dhdj_den*cosh(infos->beta_minus *arg_down)*cosh(infos->beta_minus *arg_down));
+    
+   
+    // smoothing at the two bounda ry rows only (leading and trailing)
+    // leading smoothing (only j_up row)
+    for (int i = i_lead; i < i_lead + di_lead; ++i){
+        double s = (double)(i - i_lead) / (double)di_lead;
+        double alpha = s*s*(3.0 - 2.0*s); // smoothstep
+        double x_i = infos->x[i];
+        double w0 = 1.0 - alpha; // weight for endpoint value (x=0)
+        double wx = alpha;       // weight for airfoil value (x_i)
+
+        infos->y_up[j_up*M + i]   = 0.5*H*h_up + arg_up*( w0 * f_plus_case1(infos, 0.0, infos->t) + wx * f_plus_case1(infos, x_i, infos->t) );
+        infos->y_down[j_down*M+i] = 0.5*H*h_down + arg_down*( w0 * f_minus_case1(infos, 0.0, infos->t) + wx * f_minus_case1(infos, x_i, infos->t) );
+
+        infos->dydt_up[j_up*M + i]   = (1.0 - h_up)*( w0 * ddt_f_plus_case1(infos, 0.0) + wx * ddt_f_plus_case1(infos, x_i) );
+        infos->dydt_down[j_down*M + i] = (1.0 + h_down)*( w0 * ddt_f_minus_case1(infos, 0.0) + wx * ddt_f_minus_case1(infos, x_i) );
+
+        infos->dydi_up[j_up*M + i]   = infos->dxdi[i] * (1.0 - h_up) * ( w0 * ddx_f_plus_case1(infos, 0.0) + wx * ddx_f_plus_case1(infos, x_i) );
+        infos->dydi_down[j_down*M + i] = infos->dxdi[i] * (1.0 + h_down) * ( w0 * ddx_f_minus_case1(infos, 0.0) + wx * ddx_f_minus_case1(infos, x_i) );
+
+        infos->dydj_up[j_up*M + i]   = dhdj_up*( 0.5*H - ( w0 * f_plus_case1(infos, 0.0, infos->t) + wx * f_plus_case1(infos, x_i, infos->t) ) );
+        infos->dydj_down[j_down*M + i] = dhdj_down*( 0.5*H + ( w0 * f_minus_case1(infos, 0.0, infos->t) + wx * f_minus_case1(infos, x_i, infos->t) ) );
+
+        infos->D_up[j_up*M + i]   = infos->dxdi[i] * infos->dydj_up[j_up*M + i];
+        infos->D_down[j_down*M + i] = infos->dxdi[i] * infos->dydj_down[j_down*M + i];
+
+        infos->D_up_t_plus_1[j_up*M + i] = infos->dxdi[i]*dhdj_up*( 0.5*H - ( w0 * f_plus_case1(infos, 0.0, infos->t + infos->dt) + wx * f_plus_case1(infos, x_i, infos->t + infos->dt) ) );
+        infos->D_down_t_plus_1[j_down*M + i] = infos->dxdi[i]*dhdj_down*( 0.5*H + ( w0 * f_minus_case1(infos, 0.0, infos->t + infos->dt) + wx * f_minus_case1(infos, x_i, infos->t + infos->dt) ) );
     }
 }
 
-void update_y_grid_mmmmmh(struct grid_and_data *infos){
-
-    int i_lead  = infos->i_lead;
-    int i_trail = infos->i_trail;
-    int di = 8;
-
-    double time_coef          = fonction_time_1(infos, infos->t);
-    double time_coef_t_plus_1 = fonction_time_1(infos, infos->t + infos->dt);
-
-    for (int j = 0; j < infos->N; j++){
-
-        double arg_up   = 1. - (double)j / (infos->N-1); 
-        double arg_down = (double)j / (infos->N-1);       
-
-        double coef_up   = 1. - tanh(infos->beta_plus *arg_up)   / tanh(infos->beta);
-        double coef_down = tanh(infos->beta_minus*arg_down)  / tanh(infos->beta) -1.;
-
-        double h_j_up   = coef_up;   
-        double h_j_down = coef_down;
-
-        double numerator_up   = infos->beta_plus  / (double)(infos->N-1);
-        double denominator_up = tanh(infos->beta)*cosh(infos->beta_plus*arg_up)*cosh(infos->beta_plus*arg_up);
-        double dh_updj_coef   = (infos->H/2)*numerator_up / denominator_up;
-
-        double numerator_down   = infos->beta_minus / (double)(infos->N-1);
-        double denominator_down = tanh(infos->beta)*cosh(infos->beta_minus*arg_down)*cosh(infos->beta_minus*arg_down);
-        double dh_downdj_coef   = (infos->H/2)*numerator_down / denominator_down;
-
-
-        for (int i = 0; i < infos->M; i++){
-            infos->y_up[j][i]   = infos->y_up_t_plus_1[j][i];
-            infos->y_down[j][i] = infos->y_down_t_plus_1[j][i];
-
-            infos->dy_updi[j][i]   = 0.;
-            infos->dy_downdi[j][i] = 0.;
-        }
-
-        // upstream 
-        for (int i = 0; i < i_lead; i++){
-            infos->y_up_t_plus_1[j][i]   = (infos->H/2 - time_coef_t_plus_1)*coef_up   + time_coef_t_plus_1;
-            infos->y_down_t_plus_1[j][i] = (infos->H/2 + time_coef_t_plus_1)*coef_down + time_coef_t_plus_1;
-
-            infos->dy_updj[j][i]   = (infos->H/2 - time_coef)*numerator_up   / denominator_up;
-            infos->dy_downdj[j][i] = (infos->H/2 + time_coef)*numerator_down / denominator_down;
-        }
-
-
-        // Leading edge smoothing
-        for (int i = i_lead; i < i_lead + di; i++){
-
-
-            double fp = f_plus(infos, i);
-            double fm = f_minus(infos, i);
-            double df_plusdi  = -0.5*(infos->x[i]-infos->x_c)
-                            / sqrt(infos->R*infos->R - (infos->x[i]-infos->x_c)*(infos->x[i]-infos->x_c));
-            double df_minusdi = -df_plusdi;
-
-            double step  = (double)(i - i_lead) / (double)di;
-            double scale = step*step*(3. - 2.*step);  // 0 → 1
-
-            // Valeur upstream (ce qu'on avait juste avant i_lead)
-            double y_up_upstream   = (infos->H/2 - time_coef)*coef_up   + time_coef;
-            double y_down_upstream = (infos->H/2 + time_coef)*coef_down + time_coef;
-
-            // Valeur airfoil complet (ce qu'on aura à i_lead+di)
-            double y_up_airfoil   = (infos->H/2)*coef_up   + (infos->H/2)*arg_up  *f_plus(infos, i);
-            double y_down_airfoil = (infos->H/2)*coef_down + (infos->H/2)*arg_down*f_minus(infos, i);
-
-            // Interpolation cubique entre les deux
-            infos->y_up_t_plus_1[j][i]   = (1.-scale)*y_up_upstream   + scale*y_up_airfoil;
-            infos->y_down_t_plus_1[j][i] = (1.-scale)*y_down_upstream + scale*y_down_airfoil;
-
-            infos->dy_updj[j][i]   = dh_updj_coef   + scale*dh_updj_coef  *fp;
-            infos->dy_downdj[j][i] = dh_downdj_coef - scale*dh_downdj_coef*fm;
-
-            infos->dy_updi[j][i]   = scale*(infos->H/2)*infos->dxdi[i]*(1.-h_j_up)  *df_plusdi;
-            infos->dy_downdi[j][i] = scale*(infos->H/2)*infos->dxdi[i]*(1.+h_j_down)*df_minusdi;
-        }
-
-        // arifoil central
-        for (int i = i_lead + di; i <= i_trail - di; i++){
-            double df_plusdi  = -0.5*(infos->x[i]-infos->x_c)/ sqrt(infos->R*infos->R - (infos->x[i]-infos->x_c)*(infos->x[i]-infos->x_c));
-            double df_minusdi = -df_plusdi;
-
-            infos->y_up_t_plus_1[j][i]   = (infos->H/2)*coef_up   + (infos->H/2)*arg_up  *f_plus(infos, i);
-            infos->y_down_t_plus_1[j][i] = (infos->H/2)*coef_down + (infos->H/2)*arg_down*f_minus(infos, i);;
-
-            infos->dy_updj[j][i]   = dh_updj_coef   + dh_updj_coef  *f_plus(infos, i);
-            infos->dy_downdj[j][i] = dh_downdj_coef - dh_downdj_coef*f_minus(infos, i);;
-
-            infos->dy_updi[j][i]   = (infos->H/2)*infos->dxdi[i]*(1.-h_j_up)  *df_plusdi;
-            infos->dy_downdi[j][i] = (infos->H/2)*infos->dxdi[i]*(1.+h_j_down)*df_minusdi;
-        }
-
-        // Trailing edge smoothing  
-        for (int i = i_trail - di; i <= i_trail; i++){
-
-
-            double fp = f_plus(infos, i);
-            double fm = f_minus(infos, i);
-            double df_plusdi  = -0.5*(infos->x[i]-infos->x_c)
-                            / sqrt(infos->R*infos->R - (infos->x[i]-infos->x_c)*(infos->x[i]-infos->x_c));
-            double df_minusdi = -df_plusdi;
-
-            double step  = (double)(i_trail - i) / (double)di;
-            double scale = step*step*(3. - 2.*step);  // 1 → 0
-
-
-
-            // Valeur downstream (ce qu'on aura juste après i_trail)
-            double y_up_downstream   = (infos->H/2 + time_coef)*coef_up   - time_coef;
-            double y_down_downstream = (infos->H/2 - time_coef)*coef_down - time_coef;
-
-            // Valeur airfoil complet (ce qu'on avait à i_trail-di)
-            double y_up_airfoil   = (infos->H/2)*coef_up   + (infos->H/2)*arg_up  *f_plus(infos, i);
-            double y_down_airfoil = (infos->H/2)*coef_down + (infos->H/2)*arg_down*f_minus(infos, i);
-
-            // Interpolation cubique entre airfoil et downstream
-            infos->y_up_t_plus_1[j][i]   = scale*y_up_airfoil   + (1.-scale)*y_up_downstream;
-            infos->y_down_t_plus_1[j][i] = scale*y_down_airfoil + (1.-scale)*y_down_downstream;
-
-
-
-            infos->dy_updj[j][i]   = dh_updj_coef   + scale*dh_updj_coef  *fp;
-            infos->dy_downdj[j][i] = dh_downdj_coef - scale*dh_downdj_coef*fm;
-
-            infos->dy_updi[j][i]   = scale*(infos->H/2)*infos->dxdi[i]*(1.-h_j_up)  *df_plusdi;
-            infos->dy_downdi[j][i] = scale*(infos->H/2)*infos->dxdi[i]*(1.+h_j_down)*df_minusdi;
-        }
-        // downstream
-        for (int i = i_trail+1; i < infos->M; i++){
-            infos->y_up_t_plus_1[j][i]   =  (infos->H/2 + time_coef_t_plus_1)*coef_up   - time_coef_t_plus_1;
-            infos->y_down_t_plus_1[j][i] =  (infos->H/2 - time_coef_t_plus_1)*coef_down - time_coef_t_plus_1;
-
-            infos->dy_updj[j][i]   = (infos->H/2 + time_coef)*numerator_up   / denominator_up;
-            infos->dy_downdj[j][i] = (infos->H/2 - time_coef)*numerator_down / denominator_down;
-        }
-
-        for (int i = 0; i < infos->M; i++){
-            infos->dy_updt[j][i]   = (infos->y_up_t_plus_1[j][i]   - infos->y_up[j][i])   / infos->dt;
-            infos->dy_downdt[j][i] = (infos->y_down_t_plus_1[j][i] - infos->y_down[j][i]) / infos->dt;
-
-            infos->D_up[j][i]          = infos->dxdi[i]*infos->dy_updj[j][i];
-            infos->D_down[j][i]        = infos->dxdi[i]*infos->dy_downdj[j][i];
-            infos->D_up_t_plus_1[j][i]   = infos->D_up[j][i];
-            infos->D_down_t_plus_1[j][i] = infos->D_down[j][i];
-        }
+void grow_grid(struct grid_and_data *infos){
+    /*
+        pre :
+            infos : the structure we use
+        post :
+            grow the size of the grid, useful for supersonic cases
+    */
+    infos->L = 7.;
+    infos->H = 6.*infos->c;
+    //beta1 reste le même
+    if (infos->resolution == 0.0){
+        infos->beta_3 = 2.13188005; 
+    }
+    else if (infos->resolution == 0.5){
+        infos->beta_3 = 2.11396953;
+    }
+    else if (infos->resolution == 1.0){
+        infos->beta_3 = 2.10956048;
+    }
+    else{
+       infos->beta_3 = 2.13188005;  
     }
 }
 
-void update_y_grid(struct grid_and_data *infos){
-
-    int i_lead  = infos->i_lead;
-    int i_trail = infos->i_trail;
-    int di = 8;
-
-    double time_coef          = fonction_time_1(infos, infos->t);
-    double time_coef_t_plus_1 = fonction_time_1(infos, infos->t + infos->dt);
-
-    for (int j = 0; j < infos->N; j++){
-
-        double arg_up   = 1. - (double)j / (infos->N-1);
-        double arg_down = (double)j / (infos->N-1);
-
-        double coef_up   = 1. - tanh(infos->beta_plus *arg_up)   / tanh(infos->beta);
-        double coef_down = tanh(infos->beta_minus*arg_down) / tanh(infos->beta) - 1.;
-
-        double h_j_up   = coef_up;
-        double h_j_down = coef_down;
-
-        double numerator_up   = infos->beta_plus  / (double)(infos->N-1);
-        double denominator_up = tanh(infos->beta)*cosh(infos->beta_plus*arg_up)*cosh(infos->beta_plus*arg_up);
-        double dh_updj_coef   = (infos->H/2)*numerator_up / denominator_up;
-
-        double numerator_down   = infos->beta_minus / (double)(infos->N-1);
-        double denominator_down = tanh(infos->beta)*cosh(infos->beta_minus*arg_down)*cosh(infos->beta_minus*arg_down);
-        double dh_downdj_coef   = (infos->H/2)*numerator_down / denominator_down;
-
-        for (int i = 0; i < infos->M; i++){
-            infos->y_up[j][i]   = infos->y_up_t_plus_1[j][i];
-            infos->y_down[j][i] = infos->y_down_t_plus_1[j][i];
-            infos->dy_updi[j][i]   = 0.;
-            infos->dy_downdi[j][i] = 0.;
-        }
-
-        // upstream
-        for (int i = 0; i < i_lead; i++){
-            infos->y_up_t_plus_1[j][i]   = (infos->H/2 - time_coef_t_plus_1)*coef_up   + time_coef_t_plus_1;
-            infos->y_down_t_plus_1[j][i] = (infos->H/2 + time_coef_t_plus_1)*coef_down + time_coef_t_plus_1;
-
-            infos->dy_updj[j][i]   = (infos->H/2 - time_coef)*numerator_up   / denominator_up;
-            infos->dy_downdj[j][i] = (infos->H/2 + time_coef)*numerator_down / denominator_down;
-        }
-
-        // Leading edge smoothing
-        for (int i = i_lead; i < i_lead + di; i++){
-            double step  = (double)(i - i_lead) / (double)di;
-            double scale = step*step*(3. - 2.*step);  // 0 → 1
-
-            double fp = f_plus(infos, i);
-            double fm = f_minus(infos, i);
-            double df_plusdi  = -0.5*(infos->x[i]-infos->x_c)
-                               / sqrt(infos->R*infos->R - (infos->x[i]-infos->x_c)*(infos->x[i]-infos->x_c));
-            double df_minusdi = -df_plusdi;
-
-            // y_t_plus_1 : interpolation avec time_coef_t_plus_1
-            double y_up_upstream_tp1   = (infos->H/2 - time_coef_t_plus_1)*coef_up   + time_coef_t_plus_1;
-            double y_down_upstream_tp1 = (infos->H/2 + time_coef_t_plus_1)*coef_down + time_coef_t_plus_1;
-
-            double y_up_airfoil        = (infos->H/2)*coef_up   + (infos->H/2)*arg_up  *fp;
-            double y_down_airfoil      = (infos->H/2)*coef_down + (infos->H/2)*arg_down*fm;
-
-            infos->y_up_t_plus_1[j][i]   = (1.-scale)*y_up_upstream_tp1   + scale*y_up_airfoil;
-            infos->y_down_t_plus_1[j][i] = (1.-scale)*y_down_upstream_tp1 + scale*y_down_airfoil;
-
-            // dérivées : interpolation avec time_coef
-            infos->dy_updj[j][i]   = (1.-scale)*(infos->H/2 - time_coef)*numerator_up  /denominator_up
-                                    + scale*(dh_updj_coef   + dh_updj_coef  *fp);
-            infos->dy_downdj[j][i] = (1.-scale)*(infos->H/2 + time_coef)*numerator_down/denominator_down
-                                    + scale*(dh_downdj_coef - dh_downdj_coef*fm);
-
-            infos->dy_updi[j][i]   = scale*(infos->H/2)*infos->dxdi[i]*(1.-h_j_up)  *df_plusdi;
-            infos->dy_downdi[j][i] = scale*(infos->H/2)*infos->dxdi[i]*(1.+h_j_down)*df_minusdi;
-        }
-
-        // airfoil central
-        for (int i = i_lead + di; i <= i_trail - di; i++){
-            double df_plusdi  = -0.5*(infos->x[i]-infos->x_c)
-                               / sqrt(infos->R*infos->R - (infos->x[i]-infos->x_c)*(infos->x[i]-infos->x_c));
-            double df_minusdi = -df_plusdi;
-
-            infos->y_up_t_plus_1[j][i]   = (infos->H/2)*coef_up   + (infos->H/2)*arg_up  *f_plus(infos, i);
-            infos->y_down_t_plus_1[j][i] = (infos->H/2)*coef_down + (infos->H/2)*arg_down*f_minus(infos, i);
-
-            infos->dy_updj[j][i]   = dh_updj_coef   + dh_updj_coef  *f_plus(infos, i);
-            infos->dy_downdj[j][i] = dh_downdj_coef - dh_downdj_coef*f_minus(infos, i);
-
-            infos->dy_updi[j][i]   = (infos->H/2)*infos->dxdi[i]*(1.-h_j_up)  *df_plusdi;
-            infos->dy_downdi[j][i] = (infos->H/2)*infos->dxdi[i]*(1.+h_j_down)*df_minusdi;
-        }
-
-        // Trailing edge smoothing
-        for (int i = i_trail - di; i <= i_trail; i++){
-            double step  = (double)(i_trail - i) / (double)di;
-            double scale = step*step*(3. - 2.*step);  // 1 → 0
-
-            double fp = f_plus(infos, i);
-            double fm = f_minus(infos, i);
-            double df_plusdi  = -0.5*(infos->x[i]-infos->x_c)
-                               / sqrt(infos->R*infos->R - (infos->x[i]-infos->x_c)*(infos->x[i]-infos->x_c));
-            double df_minusdi = -df_plusdi;
-
-            // y_t_plus_1 : interpolation avec time_coef_t_plus_1
-            double y_up_downstream_tp1   = (infos->H/2 + time_coef_t_plus_1)*coef_up   - time_coef_t_plus_1;
-            double y_down_downstream_tp1 = (infos->H/2 - time_coef_t_plus_1)*coef_down - time_coef_t_plus_1;
-            double y_up_airfoil          = (infos->H/2)*coef_up   + (infos->H/2)*arg_up  *fp;
-            double y_down_airfoil        = (infos->H/2)*coef_down + (infos->H/2)*arg_down*fm;
-
-            infos->y_up_t_plus_1[j][i]   = scale*y_up_airfoil   + (1.-scale)*y_up_downstream_tp1;
-            infos->y_down_t_plus_1[j][i] = scale*y_down_airfoil + (1.-scale)*y_down_downstream_tp1;
-
-            // dérivées : interpolation avec time_coef
-            infos->dy_updj[j][i]   = scale*(dh_updj_coef   + dh_updj_coef  *fp)
-                                    + (1.-scale)*(infos->H/2 + time_coef)*numerator_up  /denominator_up;
-            infos->dy_downdj[j][i] = scale*(dh_downdj_coef - dh_downdj_coef*fm)
-                                    + (1.-scale)*(infos->H/2 - time_coef)*numerator_down/denominator_down;
-
-            infos->dy_updi[j][i]   = scale*(infos->H/2)*infos->dxdi[i]*(1.-h_j_up)  *df_plusdi;
-            infos->dy_downdi[j][i] = scale*(infos->H/2)*infos->dxdi[i]*(1.+h_j_down)*df_minusdi;
-        }
-
-        // downstream
-        for (int i = i_trail+1; i < infos->M; i++){
-            infos->y_up_t_plus_1[j][i]   = (infos->H/2 + time_coef_t_plus_1)*coef_up   - time_coef_t_plus_1;
-            infos->y_down_t_plus_1[j][i] = (infos->H/2 - time_coef_t_plus_1)*coef_down - time_coef_t_plus_1;
-
-            infos->dy_updj[j][i]   = (infos->H/2 + time_coef)*numerator_up   / denominator_up;
-            infos->dy_downdj[j][i] = (infos->H/2 - time_coef)*numerator_down / denominator_down;
-        }
-
-        // dérivées temporelles et Jacobiens
-        for (int i = 0; i < infos->M; i++){
-            infos->dy_updt[j][i]   = (infos->y_up_t_plus_1[j][i]   - infos->y_up[j][i])   / infos->dt;
-            infos->dy_downdt[j][i] = (infos->y_down_t_plus_1[j][i] - infos->y_down[j][i]) / infos->dt;
-
-            infos->D_up[j][i]            = infos->dxdi[i]*infos->dy_updj[j][i];
-            infos->D_down[j][i]          = infos->dxdi[i]*infos->dy_downdj[j][i];
-            infos->D_up_t_plus_1[j][i]   = infos->D_up[j][i];
-            infos->D_down_t_plus_1[j][i] = infos->D_down[j][i];
-        }
-    }
-}
-
-struct grid_and_data init_grid_and_data(double M_inf, double grow_rate_M_inf, double t_end ,int step_max, double amplitude_oscillation, double frequence_oscillation, double angle_of_attack){
-
+struct grid_and_data init_grid_and_data(double M_inf, double grow_rate_M_inf, double t_end ,int number_of_wrotten_steps, double resolution, double amplitude_oscillation, double frequence_oscillation, double angle_of_attack,bool hdd_storage){
     /*
         pre:
-         M_inf : the Mach number of the flow must be positive,
-         t_end : the simulation must run for a positive amount of time,
-         step_max > 0 => after how many steps we write the results on the files, usually after t_end*1000, steps, it produces an animation of 3 secondes
-         amplitude_oscillation:  the amplitude of the oscillation must be non-negative, the amplitudes
-         frequence_oscillation >= 0, 
-         angle_of_attack >= 0
+            M_inf : the Mach number of the flow must be positive,
+            t_end : the simulation must run for a positive amount of time,
+            step_max > 0 => after how many steps we write the results on the files, usually after t_end*1000, steps, it produces an animation of 3 secondes
+            amplitude_oscillation:  the amplitude of the oscillation must be non-negative, the amplitudes
+            frequence_oscillation >= 0, 
+            angle_of_attack >= 0
         post: returns a struct grid_and_data with the physical parameters, geometric parameters, grid and derivatives initialized based on the input parameters and some predefined values.
     */
 
     struct grid_and_data infos_local;
     struct grid_and_data *infos = &infos_local;
+    infos->hdd_storage = hdd_storage;
+    infos->resolution = resolution;
+
+
+    if (resolution == 0.00){
+        infos->M = 150; 
+        infos->N = 30;  
+
+        infos->beta_3 = 1.66109493; // déterminé va statement & python 
+        infos->dt = 5e-6; 
+    }
+    else if (resolution == 0.5){
+        infos->M = 450; 
+        infos->N = 90;  
+
+        infos->beta_3 = 1.64152192; // déterminé va statement & python  
+        infos->dt = 1e-6;
+    }
+    else if (resolution == 1.){
+        infos->M = 900; 
+        infos->N = 360;  
+
+        infos->beta_3 = 1.63669674; // déterminé va statement & python  
+        infos->dt = 5e-7;
+    }
+    else{
+        infos->M = 150; 
+        infos->N = 30;  
+
+        infos->beta_3 = 1.66109493; // déterminé va statement & python 
+        infos->dt = 1e-5; 
+    }
+    infos->beta_1 = 1.08865949; // déterminé va statement & python, le même peu importe la résolution
+
 
     infos->M_inf_init = M_inf;
     infos->M_inf = M_inf;
@@ -733,13 +507,19 @@ struct grid_and_data init_grid_and_data(double M_inf, double grow_rate_M_inf, do
 
     // paramètres temporels
     infos->t = 0.;
-    infos->dt = 1e-5; 
     infos->t_end = t_end;
-    infos->step_max = step_max;
+    infos->number_of_wrotten_steps = number_of_wrotten_steps;
+    infos->write_interval_steps = t_end/(infos->dt*infos->number_of_wrotten_steps);
 
+    if (M_inf <.6){
+        infos->C = 0.;
+        infos->eps_min = 1.;
+    }
+    else{
+        infos->C = .1;
+        infos->eps_min = 2.; 
+    }
 
-    infos->C = .1;
-    infos->eps_min = 2.; 
 
     infos->gamma = 1.4;
     infos->T_inf = 300.0;
@@ -758,40 +538,22 @@ struct grid_and_data init_grid_and_data(double M_inf, double grow_rate_M_inf, do
     double L = 5.;
 
     infos->c = c;
-    infos->R = 3*c;
-    infos->H = 4*c;
+    infos->R = 3.*c;
+    infos->H = 4.*c;
     infos->y_c = 0.0;
-    infos->x_c = c/2;
+    infos->x_c = c/2.;
 
     infos->L = L;
     infos->L_u = 1.5;
-    
 
+    if (infos->M_inf > 1. || grow_rate_M_inf !=0.){
+        grow_grid(infos);
+    }
 
-    infos->M = 150; 
-    infos->i_1 = (int)infos->M/5;
-    infos->i_2 = (int)infos->M*4/5;
+    infos->i_1 = (int)infos->M/6;
+    infos->i_2 = (int)infos->M*5/6;
     infos->i_lead = 0;// déterminé  dans une autre fct
     infos->i_trail = 0; // déterminé  dans une autre fct
-    infos->N = 30;  
-
-    infos->beta_1 = 0.81106561; // déterminé va statement & python
-    infos->beta_3 = 1.44500835; // déterminé va statement & python 
-
-    /*
-
-    infos->M = 450; 
-    infos->i_1 = (int)infos->M/5;
-    infos->i_2 = (int)infos->M*4/5;
-    infos->i_lead = 0;// déterminé  dans une autre fct
-    infos->i_trail = 0; // déterminé  dans une autre fct
-    infos->N = 90;  
-
-    infos->beta_1 = 0.81106561; // déterminé va statement & python
-    infos->beta_3 = 1.42774587; // déterminé va statement & python  
-    infos->dt = 5e-6;
-    // laissés tels quel ça change rien
-    */
 
     infos->beta_plus = 1.; 
     infos->beta_minus = 1.;
@@ -799,251 +561,90 @@ struct grid_and_data init_grid_and_data(double M_inf, double grow_rate_M_inf, do
 
     // paramètres de l'aile
     infos->AOA = angle_of_attack*M_PI/180.; // passe de deg à rad
+    infos->AOA_current = 0.;
+    infos->t_ramp = angle_of_attack*L/infos->c_sound_inf; //Proportionnel à l'ange d'attaque pour pas que ça aille trop vite et que ça pète
+    
+    if (angle_of_attack == 0.){
+        infos->t_ramp = 67.67; // ça change rien peu importe t_ramp, AOA = 0 donc AOA_grow_rate = 0 donc on est bon simon, sinon ça crashe 
+    }
+
+    infos->AOA_grow_rate = 5.*infos->AOA/infos->t_end;
+
     infos->mu = amplitude_oscillation/2.;
     infos->omega = frequence_oscillation; 
+    
 
     // grilles ,dérivées et caractéristiques
     infos->x = (double *)calloc(infos->M, sizeof(double));
-    infos->y_up = (double **)calloc(infos->N, sizeof(double*));
-    infos->y_down = (double **)calloc(infos->N, sizeof(double*));
+    infos->y_up = (double *)calloc(infos->N*infos->M, sizeof(double));
+    infos->y_down = (double *)calloc(infos->N*infos->M, sizeof(double));
 
-    infos->y_up_t_plus_1 = (double **)calloc(infos->N, sizeof(double*));
-    infos->y_down_t_plus_1 = (double **)calloc(infos->N, sizeof(double*));
+
     infos->dxdi = (double *)calloc(infos->M, sizeof(double));
 
-    infos->dy_updi = (double **)calloc(infos->N, sizeof(double*));
-    infos->dy_updj = (double **)calloc(infos->N, sizeof(double*));
-    infos->dy_updt = (double **)calloc(infos->N, sizeof(double*));
+    infos->dydi_up = (double *)calloc(infos->N*infos->M, sizeof(double));
+    infos->dydj_up = (double *)calloc(infos->N*infos->M, sizeof(double));
+    infos->dydt_up = (double *)calloc(infos->N*infos->M, sizeof(double));
 
-    infos->dy_downdi = (double **)calloc(infos->N, sizeof(double*));
-    infos->dy_downdj = (double **)calloc(infos->N, sizeof(double*));
-    infos->dy_downdt = (double **)calloc(infos->N, sizeof(double*));
+    infos->dydi_down = (double *)calloc(infos->N*infos->M, sizeof(double));
+    infos->dydj_down = (double *)calloc(infos->N*infos->M, sizeof(double));
+    infos->dydt_down = (double *)calloc(infos->N*infos->M, sizeof(double));
 
-    infos->D_up = (double **)calloc(infos->N, sizeof(double*));
-    infos->D_down = (double **)calloc(infos->N, sizeof(double*));
-    infos->D_up_t_plus_1 = (double **)calloc(infos->N, sizeof(double*));
-    infos->D_down_t_plus_1 = (double **)calloc(infos->N, sizeof(double*));
+    infos->D_up =(double *) calloc(infos->N*infos->M, sizeof(double));
+    infos->D_down = (double *)calloc(infos->N*infos->M, sizeof(double));
+    infos->D_up_t_plus_1 = (double *)calloc(infos->N*infos->M, sizeof(double));
+    infos->D_down_t_plus_1 = (double *)calloc(infos->N*infos->M, sizeof(double));
 
-    infos->s_up = (double***)calloc(4, sizeof(double**));
-    infos->s_down = (double***)calloc(4, sizeof(double**));
+    infos->s_up =  (double *)calloc(4*infos->N*infos->M, sizeof(double));
+    infos->s_down =  (double *)calloc(4*infos->N*infos->M, sizeof(double));
 
-    infos->s_star_up = (double***)calloc(4, sizeof(double**));
-    infos->s_star_down = (double***)calloc(4, sizeof(double**));
+    infos->s_star_up =  (double *)calloc(4*infos->N*infos->M, sizeof(double));
+    infos->s_star_down =  (double *)calloc(4*infos->N*infos->M, sizeof(double));
 
-    infos->F_x_up = (double***)calloc(4, sizeof(double**));
-    infos->F_x_down = (double***)calloc(4, sizeof(double**));
-    infos->F_x_star_up = (double***)calloc(4, sizeof(double**));
-    infos->F_x_star_down = (double***)calloc(4, sizeof(double**));
-    
-    infos->F_y_up = (double***)calloc(4, sizeof(double**));
-    infos->F_y_down = (double***)calloc(4, sizeof(double**));
-    infos->F_y_star_up = (double***)calloc(4, sizeof(double**));
-    infos->F_y_star_down = (double***)calloc(4, sizeof(double**));
+    infos->F_i_up =  (double *)calloc(4*infos->N*infos->M, sizeof(double));
+    infos->F_i_down =  (double *)calloc(4*infos->N*infos->M, sizeof(double));
+    infos->F_i_star_up =  (double *)calloc(4*infos->N*infos->M, sizeof(double));
+    infos->F_i_star_down =  (double *)calloc(4*infos->N*infos->M, sizeof(double));
 
-    infos->F_i_up = (double***)calloc(4, sizeof(double**));
-    infos->F_i_down = (double***)calloc(4, sizeof(double**));
-    infos->F_i_star_up = (double***)calloc(4, sizeof(double**));
-    infos->F_i_star_down = (double***)calloc(4, sizeof(double**));
+    infos->F_j_up =  (double *)calloc(4*infos->N*infos->M, sizeof(double));
+    infos->F_j_down =  (double *)calloc(4*infos->N*infos->M, sizeof(double));
+    infos->F_j_star_up =  (double *)calloc(4*infos->N*infos->M, sizeof(double));
+    infos->F_j_star_down =  (double *)calloc(4*infos->N*infos->M, sizeof(double));
 
-    infos->F_j_up = (double***)calloc(4, sizeof(double**));
-    infos->F_j_down = (double***)calloc(4, sizeof(double**));
-    infos->F_j_star_up = (double***)calloc(4, sizeof(double**));
-    infos->F_j_star_down = (double***)calloc(4, sizeof(double**));
-
-    for (int i = 0; i < 4; i++) {
-        infos->s_up[i] = (double **)calloc(infos->N, sizeof(double*));
-        infos->s_down[i] = (double **)calloc(infos->N, sizeof(double*));
-        infos->s_star_up[i] = (double **)calloc(infos->N, sizeof(double*));
-        infos->s_star_down[i] = (double **)calloc(infos->N, sizeof(double*));
-
-        infos->F_x_up[i] = (double **)calloc(infos->N, sizeof(double*));
-        infos->F_x_down[i] = (double **)calloc(infos->N, sizeof(double*));
-        infos->F_x_star_up[i] = (double **)calloc(infos->N, sizeof(double*));
-        infos->F_x_star_down[i] = (double **)calloc(infos->N, sizeof(double*));
-
-        infos->F_y_up[i] = (double **)calloc(infos->N, sizeof(double*));
-        infos->F_y_down[i] = (double **)calloc(infos->N, sizeof(double*));
-        infos->F_y_star_up[i] = (double **)calloc(infos->N, sizeof(double*));
-        infos->F_y_star_down[i] = (double **)calloc(infos->N, sizeof(double*));
-
-        infos->F_i_up[i] = (double **)calloc(infos->N, sizeof(double*));
-        infos->F_i_down[i] = (double **)calloc(infos->N, sizeof(double*));
-        infos->F_i_star_up[i] = (double **)calloc(infos->N, sizeof(double*));
-        infos->F_i_star_down[i] = (double **)calloc(infos->N, sizeof(double*));
-
-        infos->F_j_up[i] = (double **)calloc(infos->N, sizeof(double*));
-        infos->F_j_down[i] = (double **)calloc(infos->N, sizeof(double*));
-        infos->F_j_star_up[i] = (double **)calloc(infos->N, sizeof(double*));
-        infos->F_j_star_down[i] = (double **)calloc(infos->N, sizeof(double*));
-    }
-
-    for (int j =0; j <infos->N;j++){
-        infos->y_up[j] = (double*)calloc(infos->M, sizeof(double));
-        infos->y_down[j] = (double*)calloc(infos->M, sizeof(double));
-
-        infos->y_up_t_plus_1[j] = (double*)calloc(infos->M, sizeof(double));
-        infos->y_down_t_plus_1[j] = (double*)calloc(infos->M, sizeof(double));
-
-        infos->D_up[j] = (double*)calloc(infos->M, sizeof(double));
-        infos->D_down[j] = (double*)calloc(infos->M, sizeof(double));
-        infos->D_up_t_plus_1[j] = (double*)calloc(infos->M, sizeof(double));
-        infos->D_down_t_plus_1[j] = (double*)calloc(infos->M, sizeof(double));
-
-        infos->dy_updi[j] = (double*)calloc(infos->M, sizeof(double));
-        infos->dy_updj[j] = (double*)calloc(infos->M, sizeof(double));
-        infos->dy_updt[j] = (double*)calloc(infos->M, sizeof(double));
-
-        infos->dy_downdi[j] = (double*)calloc(infos->M, sizeof(double));
-        infos->dy_downdj[j] = (double*)calloc(infos->M, sizeof(double));
-        infos->dy_downdt[j] = (double*)calloc(infos->M, sizeof(double));
-
-        for (int i =0; i<4;i++){
-            infos->s_up[i][j] = (double*)calloc(infos->M, sizeof(double));
-            infos->s_down[i][j] = (double*)calloc(infos->M, sizeof(double));
-
-            infos->s_star_up[i][j] = (double*)calloc(infos->M, sizeof(double));
-            infos->s_star_down[i][j] = (double*)calloc(infos->M, sizeof(double));
-
-            infos->F_x_up[i][j] = (double*)calloc(infos->M, sizeof(double));
-            infos->F_x_down[i][j] = (double*)calloc(infos->M, sizeof(double));
-            infos->F_x_star_up[i][j] = (double*)calloc(infos->M, sizeof(double));
-            infos->F_x_star_down[i][j] = (double*)calloc(infos->M, sizeof(double));
-
-            infos->F_y_up[i][j] = (double*)calloc(infos->M, sizeof(double));
-            infos->F_y_down[i][j] = (double*)calloc(infos->M, sizeof(double));
-            infos->F_y_star_up[i][j] = (double*)calloc(infos->M, sizeof(double));
-            infos->F_y_star_down[i][j] = (double*)calloc(infos->M, sizeof(double));
-
-            infos->F_i_up[i][j] = (double*)calloc(infos->M, sizeof(double));
-            infos->F_i_down[i][j] = (double*)calloc(infos->M, sizeof(double));
-            infos->F_i_star_up[i][j] = (double*)calloc(infos->M, sizeof(double));
-            infos->F_i_star_down[i][j] = (double*)calloc(infos->M, sizeof(double));
-
-            infos->F_j_up[i][j] = (double*)calloc(infos->M, sizeof(double));
-            infos->F_j_down[i][j] = (double*)calloc(infos->M, sizeof(double));
-            infos->F_j_star_up[i][j] = (double*)calloc(infos->M, sizeof(double));
-            infos->F_j_star_down[i][j] = (double*)calloc(infos->M, sizeof(double));
-        }
-    }
-
-    
     return *infos;
 }
 
 void free_data(struct grid_and_data *infos){
+    /*
+        pre :
+            infos : the structure we use
+        post :
+           free all of the structure, we dont want it anymore ciao
+    */
     free(infos->x);
     free(infos->dxdi);
 
-    for (int j = 0; j < infos->N; j++) {
-        free(infos->y_up[j]);
-        free(infos->y_down[j]);
-
-        free(infos->y_up_t_plus_1[j]);
-        free(infos->y_down_t_plus_1[j]);
-
-        free(infos->D_up[j]);
-        free(infos->D_down[j]);
-        free(infos->D_up_t_plus_1[j]);
-        free(infos->D_down_t_plus_1[j]);
-
-        free(infos->dy_updi[j]);
-        free(infos->dy_updj[j]);
-        free(infos->dy_updt[j]);
-
-        free(infos->dy_downdi[j]);
-        free(infos->dy_downdj[j]);
-        free(infos->dy_downdt[j]);
-
-
-
-        for (int i = 0; i < 4; i++){
-            free(infos->s_up[i][j]);
-            free(infos->s_down[i][j]);
-            free(infos->s_star_up[i][j]);
-            free(infos->s_star_down[i][j]);
-
-            free(infos->F_x_up[i][j]);
-            free(infos->F_x_down[i][j]);
-            free(infos->F_x_star_up[i][j]);
-            free(infos->F_x_star_down[i][j]);
-
-            free(infos->F_y_up[i][j]);
-            free(infos->F_y_down[i][j]);
-            free(infos->F_y_star_up[i][j]);
-            free(infos->F_y_star_down[i][j]);
-
-            free(infos->F_i_up[i][j]);
-            free(infos->F_i_down[i][j]);
-            free(infos->F_i_star_up[i][j]);
-            free(infos->F_i_star_down[i][j]);
-
-            free(infos->F_j_up[i][j]);
-            free(infos->F_j_down[i][j]);
-            free(infos->F_j_star_up[i][j]);
-            free(infos->F_j_star_down[i][j]);
-        }
-    }
-
-    for (int i = 0; i < 4; i++) {
-        free(infos->s_up[i]);
-        free(infos->s_down[i]);
-        free(infos->s_star_up[i]);
-        free(infos->s_star_down[i]);
-
-        free(infos->F_x_up[i]);
-        free(infos->F_x_down[i]);
-        free(infos->F_x_star_up[i]);
-        free(infos->F_x_star_down[i]);
-
-        free(infos->F_y_up[i]);
-        free(infos->F_y_down[i]);
-        free(infos->F_y_star_up[i]);
-        free(infos->F_y_star_down[i]);
-
-        free(infos->F_i_up[i]);
-        free(infos->F_i_down[i]);
-        free(infos->F_i_star_up[i]);
-        free(infos->F_i_star_down[i]);
-
-        free(infos->F_j_up[i]);
-        free(infos->F_j_down[i]);
-        free(infos->F_j_star_up[i]);
-        free(infos->F_j_star_down[i]);
-    }
-
     free(infos->y_up);
     free(infos->y_down);
-    free(infos->y_up_t_plus_1);
-    free(infos->y_down_t_plus_1);
+
 
     free(infos->D_up);
     free(infos->D_down);
     free(infos->D_up_t_plus_1);
     free(infos->D_down_t_plus_1);
 
+    free(infos->dydi_up);
+    free(infos->dydj_up);
+    free(infos->dydt_up);
 
-    free(infos->dy_updi);
-    free(infos->dy_updj);
-    free(infos->dy_updt);
-
-    free(infos->dy_downdi);
-    free(infos->dy_downdj);
-    free(infos->dy_downdt);
+    free(infos->dydi_down);
+    free(infos->dydj_down);
+    free(infos->dydt_down);
 
     free(infos->s_up);
     free(infos->s_down);
     free(infos->s_star_up);
     free(infos->s_star_down);
-
-    free(infos->F_x_up);
-    free(infos->F_x_down);
-    free(infos->F_x_star_up);
-    free(infos->F_x_star_down);
-
-    free(infos->F_y_up);
-    free(infos->F_y_down);
-    free(infos->F_y_star_up);
-    free(infos->F_y_star_down);
 
     free(infos->F_i_up);
     free(infos->F_i_down);
@@ -1056,4 +657,5 @@ void free_data(struct grid_and_data *infos){
     free(infos->F_j_star_down);
 }
 
-#endif 
+
+#endif

@@ -19,339 +19,71 @@
 
 
 
-void test_static(){    
-    double M_inf = 0.5;
-    double t_end =  1e-4;
-    int step_max = (int) 1. ;
+// static airfoil
 
-    double grow_rate_M_inf =0.; // on veut que M_inf augmente de  1 en t_end secondes, donc on a besoin d'un taux de croissance de 2/t_end jsp pq
-    
-    double angle_of_attack = 0.; // en degré
-    double amplitude_oscillation = 0.0; // poin
-    double frequence_oscillation =0;
-
-    struct grid_and_data grid = init_grid_and_data(M_inf, grow_rate_M_inf, t_end, step_max, amplitude_oscillation, frequence_oscillation,angle_of_attack);
-
-    solver_all_steps(&grid);
-
-    free_data(&grid);
-    printf("static test done");
-}
-
-void test_moving(){    
-    double M_inf = 0.5;
-    double t_end =  1e-3;
-    int step_max = (int) 1. ;
-
-    double grow_rate_M_inf =0.; // on veut que M_inf augmente de  1 en t_end secondes, donc on a besoin d'un taux de croissance de 2/t_end jsp pq
-    
-    double angle_of_attack = 0.; // en degré
-    double amplitude_oscillation = 0.2; // poin
-    double frequence_oscillation = M_PI_2/t_end;
-
-    struct grid_and_data grid = init_grid_and_data(M_inf, grow_rate_M_inf, t_end, step_max, amplitude_oscillation, frequence_oscillation,angle_of_attack);
-
-    solver_all_steps(&grid);
-
-    free_data(&grid);
-    printf("moving test done");
-
-}
-
-
-void growing_M_inf_until_01s(){
-    double M_inf = 0.5;
-    double t_end =  .1;
-
-    double step_max_double = t_end*1000.;// tt les combien de step on stocke les valeurs dans le fichier ?, ave ct_end*1000 et dt = 1e-5 on a une animation de 3 sec environ
-    int step_max = (int) step_max_double ;
-
-    double grow_rate_M_inf =6./t_end; // on veut que M_inf augmente de  1 en t_end secondes, donc on a besoin d'un taux de croissance de 2/t_end jsp pq
-    
-    double angle_of_attack = 0.; // en degré
-    double amplitude_oscillation = 0.;
-    double frequence_oscillation = 0.;
-    
-    struct grid_and_data grid = init_grid_and_data(M_inf, grow_rate_M_inf, t_end, step_max, amplitude_oscillation, frequence_oscillation,angle_of_attack);
-
-    grow_L_to_7(&grid);
-    solver_all_steps(&grid);
-
-    free_data(&grid);
-    printf("growing_M_inf_until_01s done");
-
-}
-
-void growing_M_inf_until_05s(){
-    double M_inf = 0.5;
-    double t_end =  .5;
-
-    double step_max_double = t_end*1000.;// tt les combien de step on stocke les valeurs dans le fichier ?, ave ct_end*1000 et dt = 1e-5 on a une animation de 3 sec environ
-    int step_max = (int) step_max_double ;
-
-    double grow_rate_M_inf = 4./t_end; // on veut que M_inf augmente de  1 en t_end secondes, donc on a besoin d'un taux de croissance de 2/t_end jsp pq
-    
-    double angle_of_attack = 0.; // en degré
-    double amplitude_oscillation = 0.;
-    double frequence_oscillation = 0.;
-    
-    struct grid_and_data grid = init_grid_and_data(M_inf, grow_rate_M_inf, t_end, step_max, amplitude_oscillation, frequence_oscillation,angle_of_attack);
-
-    grow_L_to_7(&grid);
-    solver_all_steps(&grid);
-
-    free_data(&grid);
-        
-    printf("growing_M_inf_until_05s done");
-
-}
-
-
-// M_inf = 0.5
-
-
-void M_05_static_until_001s(){
-    double M_inf = 0.5;
-    double t_end =  0.01;
-
-    double step_max_double = t_end*1000.;// tt les combien de step on stocke les valeurs dans le fichier ?, ave t_end*1000 et dt = 1e-5 on a une animation de 3 sec environ
-    int step_max = (int) step_max_double ;
-
+void static_arfoil(double M_inf,double t_end, double angle_of_attack, double number_of_written_steps, double resolution, bool hdd_storage){
+    /*
+        pre :
+            M_inf : the value of the Mach Numer at the infinity
+            t_end : the time we stop the computations
+            angle_of_attack : angle of attack of the airfoil, must be in degrees
+            number_of_written_steps : how many steps we save on the file, 100 is equavelent of 3 seconds of video, 1000 of 33 
+            resolution : 0.0 for low resolution, 0.5 for mid and 1.0 for high res. the high resolution is super heavu (25 Go for 1000number_of_written_steps )
+            hdd_storage : true if the files will be too heavy and stores it on the hdd, the location of the hdd mus tbe change in the generate_filename() function in the file writer file
+        post :
+            geenrates a file of the problem, with a static airfoil, with some angle of attack. 
+    */
     double grow_rate_M_inf = 0.0;
 
-    double angle_of_attack = 0.; // en degré
     double amplitude_oscillation = 0.0;
-    double frequence_oscillation = M_PI_2/t_end;
+    double frequency_oscillation = 0.;
 
-    struct grid_and_data grid = init_grid_and_data(M_inf,grow_rate_M_inf, t_end, step_max, amplitude_oscillation, frequence_oscillation, angle_of_attack);
 
-    solver_all_steps(&grid);
-    free_data(&grid);
-    printf("M_05_moving_until_001s done");
+    solver_all_steps(M_inf, grow_rate_M_inf, t_end, number_of_written_steps,resolution,  amplitude_oscillation, frequency_oscillation,angle_of_attack, hdd_storage);
 }
 
-void M_05_moving_until_001s(){
-    double M_inf = 0.5;
-    double t_end =  0.01;
-
-    double step_max_double = t_end*1000.;// tt les combien de step on stocke les valeurs dans le fichier ?, ave t_end*1000 et dt = 1e-5 on a une animation de 3 sec environ
-    int step_max = (int) step_max_double ;
-
+void moving_airfoil(double M_inf, double t_end, double amplitude_oscillation, double frequency_oscillation,  double number_of_written_steps, double resolution, bool hdd_storage){
+    /*
+        pre :
+            M_inf : the value of the Mach Numer at the infinity
+            t_end : the time we stop the computations
+            amplitude_oscillation : amplitude of the oscillation, the higheest value of the leading/trailing edges
+            frequency_oscillation : the frequency of the oscillations 
+            number_of_written_steps : how many steps we save on the file, 100 is equavelent of 3 seconds of video, 1000 of 33 
+            resolution : 0.0 for low resolution, 0.5 for mid and 1.0 for high res. the high resolution is super heavu (25 Go for 1000number_of_written_steps )
+            hdd_storage : true if the files will be too heavy and stores it on the hdd, the location of the hdd mus tbe change in the generate_filename() function in the file writer file
+        post :
+            geenrates a file of the problem, with a moving airfoil, with some frequency of oscillation
+    */
     double grow_rate_M_inf = 0.0;
-
     double angle_of_attack = 0.; // en degré
-    double amplitude_oscillation = 0.05;
-    double frequence_oscillation = M_PI_2/t_end;
 
-    struct grid_and_data grid = init_grid_and_data(M_inf,grow_rate_M_inf, t_end, step_max, amplitude_oscillation, frequence_oscillation, angle_of_attack);
-
-    solver_all_steps(&grid);
-    free_data(&grid);
-    printf("M_05_moving_until_001s done");
-}
-
-
-void M_05_static_until_01s(){
-    double M_inf = 0.5;
-    double t_end =  0.1;
-
-    double step_max_double = t_end*1000.;// tt les combien de step on stocke les valeurs dans le fichier ?, ave t_end*1000 et dt = 1e-5 on a une animation de 3 sec environ
-    int step_max = (int) step_max_double ;
-
-    double grow_rate_M_inf = 0.0;
-
-    double angle_of_attack = 0.; // en degré
-    double amplitude_oscillation = 0.;
-    double frequence_oscillation = 0.;
-
-    struct grid_and_data grid = init_grid_and_data(M_inf, grow_rate_M_inf,t_end, step_max, amplitude_oscillation, frequence_oscillation, angle_of_attack);
-
-    solver_all_steps(&grid);
-    free_data(&grid);
-    printf("M_05_static_until_01s done");
-}
-
-void M_05_moving_until_01s(){
-    double M_inf = 0.5;
-    double t_end =  0.1;
-
-    double step_max_double = t_end*1000.;// tt les combien de step on stocke les valeurs dans le fichier ?, ave t_end*1000 et dt = 1e-5 on a une animation de 3 sec environ
-    int step_max = (int) step_max_double ;
-
-    double grow_rate_M_inf = 0.0;
-
-    double angle_of_attack = 0.; // en degré
-    double amplitude_oscillation = 0.05;
-    double frequence_oscillation = M_PI_2/t_end;
-
-    struct grid_and_data grid = init_grid_and_data(M_inf,grow_rate_M_inf, t_end, step_max, amplitude_oscillation, frequence_oscillation, angle_of_attack);
-
-    solver_all_steps(&grid);
-    free_data(&grid);
-    printf("M_05_moving_until_001s done");
-}
-
-// M_inf = 0.85
-
-void M_085_static_until_001s(){
-    double M_inf = 0.85;
-    double t_end =  0.01;
-
-    double step_max_double = t_end*1000.;// tt les combien de step on stocke les valeurs dans le fichier ?, ave ct_end*1000 et dt = 1e-5 on a une animation de 3 sec environ
-    int step_max = (int) step_max_double ;
-
-    double grow_rate_M_inf = 0.0;
-
-    double angle_of_attack = 0.; // en degré
-    double amplitude_oscillation = 0.;
-    double frequence_oscillation = 0.;
-
-    struct grid_and_data grid = init_grid_and_data(M_inf,grow_rate_M_inf, t_end, step_max, amplitude_oscillation, frequence_oscillation,angle_of_attack);
-
-    solver_all_steps(&grid);
-
-    free_data(&grid);
-    printf("M_085_static_until_001s done");
+    solver_all_steps(M_inf, grow_rate_M_inf, t_end, number_of_written_steps,resolution,  amplitude_oscillation, frequency_oscillation,angle_of_attack, hdd_storage);
 
 }
 
-void M_085_moving_until_001s(){
-    double M_inf = 0.85;
-    double t_end =  .01;
+void rising_mach(double M_inf_init, double M_inf_end, double t_end,  double angle_of_attack, double number_of_written_steps, double resolution, bool hdd_storage){
+    /* NOT WORKING NOW
+        pre :
+            M_inf : the value of the Mach Numer at the infinity at the beginning of the simulation
+            M_inf_end : the value of the Mach Numer at the infinity at the end of the simulation
+            t_end : the time we stop the computations
+            angle_of_attack : angle of attack of the airfoil, must be in degrees
+            number_of_written_steps : how many steps we save on the file, 100 is equavelent of 3 seconds of video, 1000 of 33 
+            resolution : 0.0 for low resolution, 0.5 for mid and 1.0 for high res. the high resolution is super heavu (25 Go for 1000number_of_written_steps )
+            hdd_storage : true if the files will be too heavy and stores it on the hdd, the location of the hdd mus tbe change in the generate_filename() function in the file writer file
+        post :
+            geenrates a file of the problem, with a  with a static airfoil, with some angle of attack. 
+    */
+    double grow_rate_M_inf = (M_inf_end-M_inf_init)/t_end;
 
-    double step_max_double = t_end*1000.;// tt les combien de step on stocke les valeurs dans le fichier ?, ave ct_end*1000 et dt = 1e-5 on a une animation de 3 sec environ
-    int step_max = (int) step_max_double ;
+    double amplitude_oscillation = 0.0;
+    double frequency_oscillation = 0.;
+    //bool hdd_storage = false; // true pour stocker les données sur le disque dur et pas sur un ordi, changer la destination du disque dure dans file_writer
 
-    double grow_rate_M_inf = 0.0;
-
-    double angle_of_attack = 0.; // en degré
-    double amplitude_oscillation = 0.2; // poin
-    double frequence_oscillation = M_PI_2/t_end;
-
-    
-    struct grid_and_data grid = init_grid_and_data(M_inf,grow_rate_M_inf, t_end, step_max, amplitude_oscillation, frequence_oscillation,angle_of_attack);
-
-    solver_all_steps(&grid);
-
-    free_data(&grid);
-    printf("M_085_moving_until_001s done");
-
-}
-
-
-void M_085_static_until_01s(){
-    double M_inf = 0.85;
-    double t_end =  0.1;
-
-    double step_max_double = t_end*1000.;// tt les combien de step on stocke les valeurs dans le fichier ?, ave ct_end*1000 et dt = 1e-5 on a une animation de 3 sec environ
-    int step_max = (int) step_max_double ;
-
-    double grow_rate_M_inf = 0.0;
-
-    double angle_of_attack = 0.; // en degré
-    double amplitude_oscillation = 0.;
-    double frequence_oscillation = 0.;
-
-    struct grid_and_data grid = init_grid_and_data(M_inf,grow_rate_M_inf, t_end, step_max, amplitude_oscillation, frequence_oscillation,angle_of_attack);
-
-    solver_all_steps(&grid);
-
-    free_data(&grid);
-    printf("M_085_static_until_01s done");
+    solver_all_steps(M_inf_init, grow_rate_M_inf, t_end, number_of_written_steps,resolution,  amplitude_oscillation, frequency_oscillation,angle_of_attack, hdd_storage);
 
 }
 
-void M_085_moving_until_01s(){
-    double M_inf = 0.85;
-    double t_end =  .1;
-
-    double step_max_double = t_end*1000.;// tt les combien de step on stocke les valeurs dans le fichier ?, ave ct_end*1000 et dt = 1e-5 on a une animation de 3 sec environ
-    int step_max = (int) step_max_double ;
-
-    double grow_rate_M_inf = 0.0;
-
-    double angle_of_attack = 0.; // en degré
-    double amplitude_oscillation = 0.2; // poin
-    double frequence_oscillation = 10.*M_PI_2/t_end;
-
-    
-    struct grid_and_data grid = init_grid_and_data(M_inf,grow_rate_M_inf, t_end, step_max, amplitude_oscillation, frequence_oscillation,angle_of_attack);
-
-    solver_all_steps(&grid);
-
-    free_data(&grid);
-    printf("M_085_moving_until_01s done");
-
-}
-
-// M_inf > 1
-
-void M_13_static_until_01s(){
-    double M_inf = 1.3;
-    double t_end =  .1;
-
-    double step_max_double = t_end*1000.;// tt les combien de step on stocke les valeurs dans le fichier ?, ave ct_end*1000 et dt = 1e-5 on a une animation de 3 sec environ
-    int step_max = (int) step_max_double ;
-
-    double grow_rate_M_inf = 0.0;
-
-    double angle_of_attack = 0.; // en degré
-    double amplitude_oscillation = 0.;
-    double frequence_oscillation = 0.;
-
-    
-    struct grid_and_data grid = init_grid_and_data(M_inf,grow_rate_M_inf, t_end, step_max, amplitude_oscillation, frequence_oscillation,angle_of_attack);
-
-    solver_all_steps(&grid);
-
-    free_data(&grid);
-    printf("M_13_static_until_01s done");
-
-}
-
-void M_13_moving_until_001s(){
-    double M_inf = 1.3;
-    double t_end =  .01;
-
-    double step_max_double = t_end*1000.;// tt les combien de step on stocke les valeurs dans le fichier ?, ave ct_end*1000 et dt = 1e-5 on a une animation de 3 sec environ
-    int step_max = (int) step_max_double ;
-
-    double grow_rate_M_inf = 0.0;
-
-    double angle_of_attack = 0.; // en degré
-    double amplitude_oscillation = 0.2; 
-    double frequence_oscillation = 10.*M_PI_2/t_end;
-
-    
-    struct grid_and_data grid = init_grid_and_data(M_inf, grow_rate_M_inf,t_end, step_max, amplitude_oscillation, frequence_oscillation,angle_of_attack);
-
-    solver_all_steps(&grid);
-
-    free_data(&grid);
-    printf("M_13_moving_until_001s done");
-
-}
-
-void M_5_static_until_01s(){
-    double M_inf = 5.;
-    double t_end =  .1;
-
-    double step_max_double = t_end*1000.;// tt les combien de step on stocke les valeurs dans le fichier ?, ave ct_end*1000 et dt = 1e-5 on a une animation de 3 sec environ
-    int step_max = (int) step_max_double ;
-
-    double grow_rate_M_inf = 0.0;
-
-    double angle_of_attack = 0.; // en degré
-    double amplitude_oscillation = 0.;
-    double frequence_oscillation = 0.;
-
-    struct grid_and_data grid = init_grid_and_data(M_inf,grow_rate_M_inf, t_end, step_max, amplitude_oscillation, frequence_oscillation,angle_of_attack);
-
-    solver_all_steps(&grid);
-
-    free_data(&grid);
-    printf("M_5_static_until_01s done");
-
-}
 
 #endif 

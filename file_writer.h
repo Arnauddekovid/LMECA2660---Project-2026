@@ -12,117 +12,103 @@
 
 #include "grid_and_data.h"
 
-FILE * generate_file(struct grid_and_data *infos){
-    char *filename = (char*) calloc(100, sizeof(char));
-    if (infos->mu > 0.){
-        sprintf(filename,"M_%g_moving_until_%gs.txt", infos->M_inf,infos->t_end);
+
+char * generate_filename(struct grid_and_data *infos){
+    /*
+        pre :
+            infos : the structure we use
+        post :
+           char * : generates binary file name with Resolution_M_inf__moving_or_not_until_t_end_binary.bin and store in the hdd or not
+    */
+    char *filename = (char*) calloc(170, sizeof(char));
+    char *resolution = (char*) calloc(10, sizeof(char));
+    if (infos->resolution == 0.){
+        snprintf(resolution,10,"low_res_");
     }
-    else if (infos->grow_rate_M_inf > 0.){
-        sprintf(filename,"M_%g_growing_until_%gs.txt", infos->M_inf,infos->t_end);  
+    else if (infos->resolution == 0.5){
+        snprintf(resolution,10,"mid_res_");
+    }
+    else if (infos->resolution == 1.){
+        snprintf(resolution,10,"high_res_");
     }
     else{
-        sprintf(filename,"M_%g_static_until_%gs.txt", infos->M_inf,infos->t_end);
+        snprintf(resolution,10,"low_res_" );
+
     }
-    FILE * fp = fopen(filename, "w"); 
-    return fp;
+
+    char *M_inf = (char*) calloc(20, sizeof(char));
+    snprintf(M_inf,20,"M_inf_%g_", infos->M_inf);
+
+    char* behavior = (char*) calloc(25, sizeof(char));
+    if (infos->grow_rate_M_inf != 0.){
+        snprintf(behavior,25,"growing_rate_M_inf_%g_", infos->grow_rate_M_inf);
+    }
+    else if (infos->mu != 0.){
+        snprintf(behavior,25,"oscillating_mu_%g_", infos->mu);  
+    }
+    else {
+        double AOA_deg = infos->AOA*180./M_PI;
+        snprintf(behavior,25,"static_A0A_%g_", AOA_deg);
+    }
+
+    char *t_end = (char*) calloc(20, sizeof(char));
+    snprintf(t_end,20,"until_%gs", infos->t_end);
+
+    if (infos->hdd_storage){
+        snprintf(filename,170,"/Volumes/Bruno/binaryFiles/%s%s%s%s.bin", resolution, M_inf, behavior, t_end);
+    }
+    else{
+        snprintf(filename,170,"binaryFiles/%s%s%s%s.bin", resolution, M_inf, behavior, t_end);
+    }
+
+    return filename;
 }
 
-FILE * generate_file_other_data(struct grid_and_data *infos, char * data_name){
-    char *filename = (char*) calloc(100, sizeof(char));
-    sprintf(filename,"%s M_inf = %f until t_end = %f.txt",data_name, infos->M_inf, infos->t_end);
-    FILE * fp = fopen(filename, "w"); 
-    return fp;
+void write_first_two_lines(struct grid_and_data *infos, FILE *fp) {
+    /*
+        pre :
+            infos : the structure we use
+            fp : the binary file where
+        post :
+           writes the header of the file with some informations and then the x 1D array
+    */
+
+    // Write header as raw binary
+    fwrite(&infos->N, sizeof(int), 1, fp);
+    fwrite(&infos->M, sizeof(int), 1, fp);
+    fwrite(&infos->M_inf, sizeof(double), 1, fp);
+    fwrite(&infos->T_0_inf, sizeof(double), 1, fp);
+    fwrite(&infos->p_0_inf, sizeof(double), 1, fp);
+    fwrite(&infos->R_fluid, sizeof(double), 1, fp);
+    fwrite(&infos->gamma, sizeof(double), 1, fp);
+    fwrite(&infos->c, sizeof(double), 1, fp);
+    fwrite(&infos->mu, sizeof(double), 1, fp);
+    fwrite(&infos->omega, sizeof(double), 1, fp);
+    // Write x grid (M values)
+    fwrite(infos->x, sizeof(double), infos->M, fp);
 }
 
-void write_other_data( struct grid_and_data *infos, FILE * fp, double** data_up, double** data_down){
+void write_one_time_step(struct grid_and_data *infos, FILE *fp) {
+    /*
+        pre :
+            infos : the structure we use
+            fp : the binary file where
+        post :
+           writes the timestep, the Mach Inf, the y grid and the characteristics 
+    */
+    int M = infos->M;
+    int N = infos->N;
+    
+    fwrite(&infos->t, sizeof(double), 1, fp);
+    fwrite(&infos->M_inf, sizeof(double), 1, fp);
 
-    // write the value of t
-    fprintf(fp, "%f \n", infos->t);
-    //write the coordinates of y_up
-    for (int j = 0; j < infos->N; j++){
-        for (int i = 0; i < infos->M; i++){
-            fprintf(fp, "%f ", infos->y_up[infos->N-1-j][i]);
-        }
-        fprintf(fp, "\n");
-    }
-    //write the coordinates of y_down
+    fwrite(infos->y_up, sizeof(double), N*M, fp);
+    fwrite(infos->y_down, sizeof(double), N*M, fp);
 
-    for (int j = 0; j < infos->N; j++){
-        for (int i = 0; i < infos->M; i++){
-            fprintf(fp, "%f ", infos->y_down[infos->N-1-j][i]);
-        }
-        fprintf(fp, "\n");
-    }
-    // rewrite the value of t bc why not
-    fprintf(fp, "%f \n", infos->t);
-
-    // write the values of data up annd then data down
-
-    for (int j = 0; j < infos->N; j++){
-        for (int i = 0; i < infos->M; i++){
-            fprintf(fp, "%f ", data_up[infos->N-1-j][i]);
-        }
-        fprintf(fp, "\n");
-    }
-    for (int j = 0; j < infos->N; j++){
-        for (int i = 0; i < infos->M; i++){
-            fprintf(fp, "%f ", data_down[infos->N-1-j][i]);
-
-        }
-        fprintf(fp, "\n");
-    }
-    fprintf(fp, " ");
+    fwrite(infos->s_up, sizeof(double), 4*N*M, fp);
+    fwrite(infos->s_down, sizeof(double), 4*N*M, fp);
     
 }
 
-void write_first_two_lines( struct grid_and_data *infos, FILE *fp){
-
-    fprintf(fp, "M_inf = %g T_0_inf = %g p_0_inf = %g R_fluid = %g gamma = %g c = %g mu = %g omega = %g \n", infos->M_inf, infos->T_0_inf, infos->p_0_inf, infos->R_fluid, infos->gamma, infos->c, infos->mu, infos->omega);
-    for (int j= 0; j < infos->M; j++){
-        fprintf(fp, "%f ", infos->x[j]);
-    }
-    fprintf(fp, "\n");
-}
-
-
-
-void write_one_time_step( struct grid_and_data *infos, FILE * fp){
-
-    // write the value of t
-    fprintf(fp, "y_grid at t = %g M_inf = %g\n", infos->t, infos->M_inf  );
-    //write the coordinates of y_up
-    for (int j = 0; j < infos->N; j++){
-        for (int i = 0; i < infos->M; i++){
-            fprintf(fp, "%f ", infos->y_up[infos->N-1-j][i]);
-        }
-        fprintf(fp, "\n");
-    }
-    //write the coordinates of y_down
-
-    for (int j = 0; j < infos->N; j++){
-        for (int i = 0; i < infos->M; i++){
-            fprintf(fp, "%f ", infos->y_down[infos->N-1-j][i]);
-        }
-        fprintf(fp, "\n");
-    }
-
-    for (int k = 0; k < 4; k++){
-        // rewrite the value of t bc why not
-        fprintf(fp, "s_%i at t = %g M_inf = %g\n",k, infos->t, infos->M_inf   );
-        // write the values of s_0 up annd then s_0 down
-        for (int j = 0; j < infos->N; j++){
-            for (int i = 0; i < infos->M; i++){
-                fprintf(fp, "%f ", infos->s_up[k][infos->N-1-j][i]);
-            }
-            fprintf(fp, "\n");
-        }
-        for (int j = 0; j < infos->N; j++){
-            for (int i = 0; i < infos->M; i++){
-                fprintf(fp, "%f ",  infos->s_down[k][infos->N-1-j][i]);
-            }
-            fprintf(fp, "\n");
-        }
-    }
-}
 
 #endif
